@@ -682,7 +682,7 @@ def generate_musicgen_bgm(
 def mix_voice_with_bgm(
     voice_path: Path | str,
     output_path: Path | str,
-    bgm_volume_db: float = -16.0,
+    bgm_volume_db: float = -14.0,
     bgm_style: str = "procedural",
     bgm_prompt: str | None = None,
 ) -> Path:
@@ -847,7 +847,7 @@ def run_pipeline(
     speaker_id: int = 84,
     voicevox_url: str = "http://localhost:50021",
     add_bgm: bool = True,
-    bgm_volume_db: float = -16.0,
+    bgm_volume_db: float = -14.0,
     bgm_style: str = "musicgen",
     bgm_prompt: str | None = None,
 ) -> None:
@@ -1018,9 +1018,9 @@ def main() -> None:
     parser.add_argument(
         "--bgm-volume",
         type=float,
-        default=-16.0,
+        default=-14.0,
         metavar="DB",
-        help="BGM の音量（dB）。小さいほど小さい。デフォルト: -16",
+        help="BGM の音量（dB）。小さいほど小さい。デフォルト: -14",
     )
     parser.add_argument(
         "--bgm-style",
