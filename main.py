@@ -281,30 +281,43 @@ def generate_procedural_bgm(
 ) -> "AudioSegment":
     """
     著作権フリーの手続きBGMを生成する。
-    静かなアンビエントパッド（低音の正弦波の重ね合わせ）をループで延長する。
+    scipy でローパスフィルタ・ゆっくりした振幅変調（LFO）をかけ、
+    落ち着いたアンビエントパッドにする。
     """
     import numpy as np
     from pydub import AudioSegment
+    from scipy.signal import butter, sosfiltfilt
 
-    # 落ち着いた和音（A1, E2, A2, E3 に近い周波数）
-    freqs = [55.0, 82.5, 110.0, 165.0]
-    amps = [0.12, 0.08, 0.06, 0.04]
-    fade_sec = 2.0
+    # 落ち着いた和音（ややデチューンで厚み）
+    freqs = [55.0, 82.5, 110.0, 164.0, 220.0]
+    amps = [0.14, 0.09, 0.06, 0.04, 0.02]
+    fade_sec = 2.5
     n_loop = int(sample_rate * loop_sec)
     n_fade = int(sample_rate * fade_sec)
-    t_loop = np.arange(n_loop) / sample_rate
+    t_loop = np.arange(n_loop, dtype=np.float64) / sample_rate
     envelope = np.ones(n_loop)
     envelope[:n_fade] = np.linspace(0, 1, n_fade)
     envelope[-n_fade:] = np.linspace(1, 0, n_fade)
     wave = np.zeros(n_loop)
     for f, a in zip(freqs, amps):
         wave += a * envelope * np.sin(2 * np.pi * f * t_loop)
+    # ゆっくりした振幅のうねり（LFO 約 0.03 Hz）
+    lfo = 0.92 + 0.08 * np.sin(2 * np.pi * 0.03 * t_loop)
+    wave = wave * lfo
     peak = np.abs(wave).max()
     if peak > 0:
-        wave = wave / peak * 0.35
+        wave = wave / peak * 0.38
     n_total = int(sample_rate * duration_sec)
     n_repeat = (n_total // n_loop) + 1
-    full = np.tile(wave, n_repeat)[:n_total]
+    full = np.tile(wave, n_repeat)[:n_total].astype(np.float64)
+    # ローパスフィルタで温かみ（カットオフ 約 600 Hz）
+    nyq = sample_rate / 2.0
+    cutoff = 600.0 / nyq
+    sos = butter(4, cutoff, btype="low", output="sos")
+    full = sosfiltfilt(sos, full)
+    peak = np.abs(full).max()
+    if peak > 0:
+        full = full / peak * 0.35
     samples = (np.clip(full, -1, 1) * 32767).astype(np.int16)
     return AudioSegment(
         data=samples.tobytes(),
@@ -314,14 +327,90 @@ def generate_procedural_bgm(
     )
 
 
+def generate_musicgen_bgm(
+    duration_sec: float,
+    prompt: str = "calm ambient meditation peaceful soft pad no drums",
+    model_id: str = "facebook/musicgen-small",
+    sample_rate: int = 32000,
+) -> "AudioSegment | None":
+    """
+    MusicGen（transformers）でBGMを生成する。オプション。
+    利用には transformers, torch のインストールが必要。CC-BY-NC（非商用）。
+    NumPy 2.x と PyTorch の互換性問題などで失敗した場合は None を返し、呼び出し元で手続き BGM にフォールバックする。
+    """
+    try:
+        from transformers import AutoProcessor, MusicgenForConditionalGeneration
+        import torch
+    except ImportError:
+        return None
+    # NumPy 2.x と PyTorch の互換性: .numpy() が使えないと後段で RuntimeError になるため事前チェック
+    try:
+        torch.tensor([1.0]).numpy()
+    except (RuntimeError, Exception):
+        print("   MusicGen: PyTorch と NumPy の互換性がないためスキップします（numpy<2 で利用可）。")
+        return None
+    try:
+        processor = AutoProcessor.from_pretrained(model_id)
+        model = MusicgenForConditionalGeneration.from_pretrained(model_id)
+        if torch.cuda.is_available():
+            model = model.to("cuda")
+        inputs = processor(
+            text=[prompt],
+            padding=True,
+            return_tensors="pt",
+        )
+        if next(model.parameters()).is_cuda:
+            inputs = {k: v.cuda() if hasattr(v, "cuda") else v for k, v in inputs.items()}
+        # 約 30 秒生成（50 Hz × 30 = 1500 トークン）
+        max_tokens = min(1503, int(50 * min(30, duration_sec)))
+        with torch.no_grad():
+            audio_values = model.generate(
+                **inputs,
+                do_sample=True,
+                guidance_scale=3.0,
+                max_new_tokens=max_tokens,
+            )
+        sr = model.config.audio_encoder.sampling_rate
+        wav = audio_values[0, 0].float().cpu().numpy()
+        wav = wav / max(np.abs(wav).max(), 1e-8) * 0.4
+        n_total = int(sr * duration_sec)
+        if len(wav) < n_total:
+            n_rep = (n_total // len(wav)) + 1
+            wav = np.tile(wav, n_rep)[:n_total]
+        else:
+            wav = wav[:n_total]
+        from pydub import AudioSegment
+
+        samples = (np.clip(wav, -1, 1) * 32767).astype(np.int16)
+        seg = AudioSegment(
+            data=samples.tobytes(),
+            sample_width=2,
+            frame_rate=sr,
+            channels=1,
+        )
+        if sr != sample_rate:
+            seg = seg.set_frame_rate(sample_rate)
+        return seg
+    except RuntimeError as e:
+        if "Numpy is not available" in str(e) or "numpy" in str(e).lower():
+            print("   MusicGen: PyTorch と NumPy の互換性がないためスキップします（numpy<2 で利用可）。")
+        else:
+            print(f"   MusicGen の生成に失敗しました: {e}")
+        return None
+    except Exception as e:
+        print(f"   MusicGen の初期化・生成に失敗しました: {e}")
+        return None
+
+
 def mix_voice_with_bgm(
     voice_path: Path | str,
     output_path: Path | str,
     bgm_volume_db: float = -20.0,
+    bgm_style: str = "procedural",
 ) -> Path:
     """
-    音声ファイルに手続き生成BGMを重ねて出力する。
-    BGM は著作権フリーの自動生成を使用する。
+    音声ファイルにBGMを重ねて出力する。
+    bgm_style: "procedural"（手続き・著作権フリー） or "musicgen"（AI・要 transformers/torch、CC-BY-NC）
     """
     from pydub import AudioSegment
 
@@ -330,7 +419,15 @@ def mix_voice_with_bgm(
     voice = AudioSegment.from_file(str(voice_path))
     duration_ms = len(voice)
     duration_sec = duration_ms / 1000.0
-    bgm = generate_procedural_bgm(duration_sec, sample_rate=voice.frame_rate)
+    bgm = None
+    if bgm_style == "musicgen":
+        bgm = generate_musicgen_bgm(duration_sec, sample_rate=voice.frame_rate)
+        if bgm is not None:
+            print("   BGM: MusicGen で生成しました。")
+    if bgm is None:
+        bgm = generate_procedural_bgm(duration_sec, sample_rate=voice.frame_rate)
+        if bgm_style == "musicgen":
+            print("   BGM: MusicGen が使えなかったため、手続きBGMを使用しました。")
     if voice.frame_rate != bgm.frame_rate:
         bgm = bgm.set_frame_rate(voice.frame_rate)
     if voice.channels != bgm.channels:
@@ -439,6 +536,7 @@ def run_pipeline(
     voicevox_url: str = "http://localhost:50021",
     add_bgm: bool = False,
     bgm_volume_db: float = -20.0,
+    bgm_style: str = "procedural",
 ) -> None:
     """説話生成 → 音声化 → RSS 更新まで一括実行する。"""
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -482,7 +580,12 @@ def run_pipeline(
 
     if add_bgm:
         print("3.5. BGM を追加しています...")
-        mix_voice_with_bgm(audio_path, audio_path, bgm_volume_db=bgm_volume_db)
+        mix_voice_with_bgm(
+            audio_path,
+            audio_path,
+            bgm_volume_db=bgm_volume_db,
+            bgm_style=bgm_style,
+        )
         print(f"   BGM 付きで上書き: {audio_path}")
 
     podcast_title = os.environ.get("PODCAST_TITLE", "仏教説話ポッドキャスト")
@@ -578,6 +681,13 @@ def main() -> None:
         metavar="DB",
         help="BGM の音量（dB）。小さいほど小さい。デフォルト: -20",
     )
+    parser.add_argument(
+        "--bgm-style",
+        type=str,
+        choices=["procedural", "musicgen"],
+        default="procedural",
+        help="BGM の生成方法: procedural=手続き（軽量・著作権フリー）, musicgen=AI（要 transformers/torch・CC-BY-NC）",
+    )
 
     args = parser.parse_args()
 
@@ -644,6 +754,7 @@ def main() -> None:
         voicevox_url=args.voicevox_url,
         add_bgm=args.add_bgm,
         bgm_volume_db=args.bgm_volume,
+        bgm_style=args.bgm_style,
     )
 
 
