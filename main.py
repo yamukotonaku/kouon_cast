@@ -181,6 +181,7 @@ def load_stories_text(stories_dir: Path | str) -> str:
     """
     /stories フォルダ内のすべての .txt ファイルを読み込み、
     一つの大きなテキストブロックとして結合する。
+    （下位互換用。説話生成のコンテキストは load_story_context を使用する。）
     """
     stories_dir = Path(stories_dir)
     if not stories_dir.is_dir():
@@ -194,6 +195,53 @@ def load_stories_text(stories_dir: Path | str) -> str:
                 blocks.append(text)
         except Exception as e:
             print(f"警告: {path} の読み込みに失敗しました: {e}")
+
+    return "\n\n---\n\n".join(blocks) if blocks else ""
+
+
+def load_story_context(
+    stories_dir: Path | str,
+    output_dir: Path | str,
+    output_latest_n: int = 15,
+    stories_random_n: int = 10,
+) -> str:
+    """
+    説話生成用のコンテキストを組み立てる。
+    - output_dir 内の .txt のうち、更新日時が新しい順に最大 output_latest_n 個
+    - stories_dir 内の .txt からランダムに最大 stories_random_n 個
+    を読み、結合して返す。
+    """
+    output_dir = Path(output_dir)
+    stories_dir = Path(stories_dir)
+    blocks: list[str] = []
+
+    # output/*.txt の最新 output_latest_n 個（mtime 降順）
+    if output_dir.is_dir():
+        output_txts = sorted(
+            output_dir.glob("*.txt"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )[:output_latest_n]
+        for path in output_txts:
+            try:
+                text = path.read_text(encoding="utf-8").strip()
+                if text:
+                    blocks.append(text)
+            except Exception as e:
+                print(f"警告: {path} の読み込みに失敗しました: {e}")
+
+    # stories/*.txt からランダムに stories_random_n 個
+    if stories_dir.is_dir():
+        stories_list = list(stories_dir.glob("*.txt"))
+        if stories_list:
+            n = min(stories_random_n, len(stories_list))
+            for path in random.sample(stories_list, n):
+                try:
+                    text = path.read_text(encoding="utf-8").strip()
+                    if text:
+                        blocks.append(text)
+                except Exception as e:
+                    print(f"警告: {path} の読み込みに失敗しました: {e}")
 
     return "\n\n---\n\n".join(blocks) if blocks else ""
 
@@ -816,7 +864,12 @@ def run_pipeline(
     merge_all_split_wavs_in_dir(output_dir)
 
     print("1. 説話テキストと仏教の知識を読み込んでいます...")
-    context = load_stories_text(stories_dir)
+    context = load_story_context(
+        stories_dir,
+        output_dir,
+        output_latest_n=15,
+        stories_random_n=10,
+    )
     knowledge_context = load_knowledge_text(knowledge_dir)
     print(f"   説話: {len(context)} 文字 / 知識: {len(knowledge_context)} 文字")
 
