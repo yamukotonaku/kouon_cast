@@ -28,6 +28,7 @@ load_dotenv()
 # デフォルトパス
 PROJECT_ROOT = Path(__file__).resolve().parent
 STORIES_DIR = PROJECT_ROOT / "stories"
+KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge"  # 仏教の知識（Markdown）を置くディレクトリ
 OUTPUT_DIR = PROJECT_ROOT / "output"
 FEED_PATH = OUTPUT_DIR / "feed.xml"
 
@@ -146,6 +147,31 @@ def pick_random_theme() -> str:
     return f"{major} — {minor}"
 
 
+# MusicGen の --bgm-prompt 未指定時にランダムで選ぶ候補（説話BGM向け・落ち着いた雰囲気）
+BGM_PROMPTS = [
+    "soft piano gentle strings meditation",
+    "calm ambient meditation peaceful pad no drums",
+    "harp and flute peaceful contemplative",
+    "soft strings pad ambient meditation",
+    "gentle piano ambient calm no percussion",
+    "bells and pad soft meditation",
+    "acoustic guitar fingerpicking calm peaceful",
+    "soft synth pad ambient contemplative",
+    "flute and strings peaceful meditation",
+    "piano and cello gentle contemplative",
+    "wind chimes soft pad ambient",
+    "ethnic bamboo flute calm meditation",
+    "soft organ pad peaceful no drums",
+    "marimba and strings gentle ambient",
+    "kalimba and pad calm meditation",
+]
+
+
+def pick_random_bgm_prompt() -> str:
+    """--bgm-prompt 未指定時に使うランダムな MusicGen プロンプトを返す。"""
+    return random.choice(BGM_PROMPTS)
+
+
 # ---------------------------------------------------------------------------
 # 1. テキスト集約ロジック
 # ---------------------------------------------------------------------------
@@ -172,14 +198,40 @@ def load_stories_text(stories_dir: Path | str) -> str:
     return "\n\n---\n\n".join(blocks) if blocks else ""
 
 
+def load_knowledge_text(knowledge_dir: Path | str) -> str:
+    """
+    knowledge/ フォルダ内のすべての .md ファイルを読み込み、
+    一つのテキストブロックとして結合する。説話生成時に仏教の知識としてプロンプトに渡す。
+    """
+    knowledge_dir = Path(knowledge_dir)
+    if not knowledge_dir.is_dir():
+        return ""
+
+    blocks: list[str] = []
+    for path in sorted(knowledge_dir.glob("*.md")):
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+            if text:
+                blocks.append(text)
+        except Exception as e:
+            print(f"警告: {path} の読み込みに失敗しました: {e}")
+
+    return "\n\n---\n\n".join(blocks) if blocks else ""
+
+
 # ---------------------------------------------------------------------------
 # 2. Gemini 連携ロジック
 # ---------------------------------------------------------------------------
 
 
-def generate_story(api_key: str, context: str, theme: str) -> dict[str, str]:
+def generate_story(
+    api_key: str,
+    context: str,
+    theme: str,
+    knowledge_context: str = "",
+) -> dict[str, str]:
     """
-    仏教説話の編纂者として、コンテキストとテーマから新説話を生成する。
+    仏教説話の編纂者として、コンテキスト・テーマ・仏教の知識から新説話を生成する。
     戻り値: {"title": "タイトル", "body": "本文"}
     """
     from google import genai
@@ -188,11 +240,13 @@ def generate_story(api_key: str, context: str, theme: str) -> dict[str, str]:
     client = genai.Client(api_key=api_key)
 
     system_instruction = """あなたは仏教説話の編纂者です。
-与えられた既存の説話集を踏まえ、同じトーン・文体・教訓の流れで新しい説話を創作してください。
+与えられた既存の説話集と仏教の知識を踏まえ、同じトーン・文体・教訓の流れで新しい説話を創作してください。仏教の知識（教義・用語・故事など）を活用し、説話に深みと教養を反映してください。
 出力は音声合成（TTS）に適するよう、ルビや振り仮名は一切付けず、句読点を適切に打ってください。
 必ず「タイトル」と「本文」の2つだけを、以下の形式で出力してください。余計な説明は不要です。
 
 【意外性】説話には、聞き手が「なるほど」「意外だ」と感じるようなひねりや視点の転換を織り交ぜてください。型通りの教訓だけでなく、予想外の登場人物（泥棒、子ども、動物、名もなき老人など）、逆説的な結末、身近な比喩や意外な対比を使うと、印象に残りやすくなります。古典の枠を守りつつ、少し意外性のある展開を心がけてください。
+
+【固有名詞・登場人物のバリエーション】人名・地名は毎回変えて、多様にしてください。同じ名前（例: ヴァーシャ、ヴィサーラ、ラージャグリハ）や同じ地域ばかりにせず、インド風以外の名前・地名や架空の国名・町名も交え、固有名詞に幅を持たせてください。登場人物の職業・立場も、木工師・陶工・書記官・染物師・石工などに偏らず、農民、漁師、船頭、樵、鍛冶屋、楽師、医者、旅の商人、托鉢僧、王の側近、孤児、病人、名もなき老婆など、多様な職業・立場を登場させてください。
 
 【分量】本文はたっぷりの長さで書いてください。目安として2000字以上3500字程度（音声で約15分〜20分になる分量。短い説話の2〜2.5倍の長さ）とし、情景・登場人物の心の動き・対話・教訓が伝わるよう、丁寧にゆったりと展開してください。エピソードを増やしたり、会話や内心描写を厚くして、読み応えのある説話にしてください。
 
@@ -202,13 +256,22 @@ def generate_story(api_key: str, context: str, theme: str) -> dict[str, str]:
 （ここに説話の本文を書く。段落は空行で区切る）
 """
 
+    # コンテキスト長の配分（説話集優先、知識は残り）
+    context_max = 400000
+    knowledge_max = 100000
+    context_truncated = (context[:context_max] if context else "（説話がまだ登録されていません。一般的な仏教説話のスタイルで創作してください。）")
+    knowledge_truncated = (knowledge_context[:knowledge_max] if knowledge_context else "")
+
     prompt = f"""【既存の説話集（参考コンテキスト）】
-{context[:500000] if context else "（説話がまだ登録されていません。一般的な仏教説話のスタイルで創作してください。）"}
+{context_truncated}
+
+【仏教の知識（参考・活用すること）】
+{knowledge_truncated if knowledge_truncated else "（追加の知識はありません。一般的な仏教の教えを踏まえて創作してください。）"}
 
 【今回のテーマ】
 {theme}
 
-上記テーマに沿った新しい説話を1本、創作してください。説話の本文は、音声で約15分〜20分になる長さ（目安: 2000字〜3500字）で、情景・対話・教訓が伝わるよう丁寧にゆったりと書いてください。短い説話の2〜2.5倍の分量にしてください。"""
+上記テーマに沿い、説話集と仏教の知識を活用した新しい説話を1本、創作してください。説話の本文は、音声で約15分〜20分になる長さ（目安: 2000字〜3500字）で、情景・対話・教訓が伝わるよう丁寧にゆったりと書いてください。短い説話の2〜2.5倍の分量にしてください。"""
 
     response = client.models.generate_content(
         model="gemini-2.5-pro",
@@ -288,9 +351,13 @@ def generate_story_summary(api_key: str, title: str, body: str) -> str:
     from google.genai import types
 
     client = genai.Client(api_key=api_key)
-    prompt = f"""以下の仏教説話の要約を、2〜3文で書いてください。
-Podcast のエピソード説明（ショート説明）に使うため、聞き手が「どんな話か」を一目で分かるようにしてください。
-余計な前置きや「要約は以下の通りです」などの説明は不要です。要約文だけを出力してください。
+    prompt = f"""以下の仏教説話の「導入・状況説明」だけを、2〜3文で書いてください。
+
+【条件】
+- 物語の結末・オチは一切含めないでください。
+- 誰がどんな状況にいるか、何が問われているかだけを簡潔に書き、聴き手が「続きが気になる」ような仕上がりにしてください。
+- Podcast のエピソード説明に使うため、ネタバレせず興味を引く書き方にしてください。
+- 余計な前置きや「要約は以下の通りです」などの説明は不要です。要約文だけを出力してください。
 
 【タイトル】
 {title}
@@ -567,7 +634,7 @@ def generate_musicgen_bgm(
 def mix_voice_with_bgm(
     voice_path: Path | str,
     output_path: Path | str,
-    bgm_volume_db: float = -18.0,
+    bgm_volume_db: float = -16.0,
     bgm_style: str = "procedural",
     bgm_prompt: str | None = None,
 ) -> Path:
@@ -677,8 +744,8 @@ def update_podcast_feed(
             audio_files.append(f)
     audio_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
 
-    # エピソードのサマリー用: 同一 stem の .txt があれば本文の先頭を利用（最大文字数）
-    summary_max_chars = 500
+    # エピソード説明用: 「サマリー:」が無い場合は本文冒頭をフォールバック（description を必ず出す）
+    summary_fallback_chars = 500
 
     # podgen は .wav を標準で扱わないため、MIME タイプを明示する
     mime_by_ext = {".wav": "audio/wav", ".mp3": "audio/mpeg"}
@@ -693,7 +760,7 @@ def update_podcast_feed(
         e.media = Media(media_url, size=size, type=media_type)
         e.publication_date = datetime.fromtimestamp(audio_path.stat().st_mtime, tz=timezone.utc)
 
-        # 同一名の .txt から物語サマリーを設定（Podcast アプリで表示される）
+        # 同一名の .txt から物語サマリーを設定（Podcast の description に表示される）
         txt_path = output_dir / f"{audio_path.stem}.txt"
         if txt_path.is_file():
             try:
@@ -706,9 +773,11 @@ def update_podcast_feed(
                     if line.startswith("サマリー:") or line.startswith("サマリー："):
                         summary = (line.split(":", 1)[-1].split("：", 1)[-1].strip())
                         break
-                if not summary:
-                    summary = body[:summary_max_chars] + ("…" if len(body) > summary_max_chars else "")
-                e.summary = summary
+                # Gemini 要約を優先。無い場合は本文冒頭をフォールバックして description を必ず出す
+                if not summary and body:
+                    summary = body[:summary_fallback_chars] + ("…" if len(body) > summary_fallback_chars else "")
+                if summary:
+                    e.summary = summary
             except Exception:
                 pass  # 読み込み失敗時はサマリーなしのまま
 
@@ -724,12 +793,13 @@ def update_podcast_feed(
 def run_pipeline(
     theme: str,
     stories_dir: Path | str = STORIES_DIR,
+    knowledge_dir: Path | str = KNOWLEDGE_DIR,
     output_dir: Path | str = OUTPUT_DIR,
     feed_path: Path | str = FEED_PATH,
     speaker_id: int = 84,
     voicevox_url: str = "http://localhost:50021",
     add_bgm: bool = True,
-    bgm_volume_db: float = -18.0,
+    bgm_volume_db: float = -16.0,
     bgm_style: str = "musicgen",
     bgm_prompt: str | None = None,
 ) -> None:
@@ -745,16 +815,19 @@ def run_pipeline(
     # デフォルト: output 内の分割 WAV を 1 本の MP3 に結合する
     merge_all_split_wavs_in_dir(output_dir)
 
-    print("1. 説話テキストを読み込んでいます...")
+    print("1. 説話テキストと仏教の知識を読み込んでいます...")
     context = load_stories_text(stories_dir)
-    print(f"   読み込み: {len(context)} 文字")
+    knowledge_context = load_knowledge_text(knowledge_dir)
+    print(f"   説話: {len(context)} 文字 / 知識: {len(knowledge_context)} 文字")
 
     print("2. Gemini で説話を生成しています...")
-    story = generate_story(api_key, context, theme)
+    story = generate_story(api_key, context, theme, knowledge_context=knowledge_context)
     print(f"   タイトル: {story['title']}")
 
-    # サマリーを Gemini で生成（Podcast エピソード説明用）
+    # サマリーを Gemini で生成（Podcast の description 用）。失敗時は本文冒頭をフォールバック
     summary = generate_story_summary(api_key, story["title"], story["body"])
+    if not summary and story["body"]:
+        summary = story["body"][:400].strip() + ("…" if len(story["body"]) > 400 else "")
     if summary:
         print(f"   サマリー: {summary[:60]}…" if len(summary) > 60 else f"   サマリー: {summary}")
 
@@ -763,7 +836,7 @@ def run_pipeline(
     base_name = f"{date_str}_{safe_title}"
     audio_path = output_dir / f"{base_name}.mp3"
 
-    # 法話テキストを .txt で保存（サマリーがあれば「サマリー:」行を追加）
+    # 法話テキストを .txt で保存（要約を「サマリー:」行として埋め込み → feed.xml の description に出力）
     text_path = output_dir / f"{base_name}.txt"
     header_lines = [f"タイトル: {story['title']}"]
     if summary:
@@ -785,6 +858,9 @@ def run_pipeline(
 
     if add_bgm:
         print("3.5. BGM を追加しています...")
+        if bgm_style == "musicgen" and bgm_prompt is None:
+            bgm_prompt = pick_random_bgm_prompt()
+            print(f"   BGM プロンプト: {bgm_prompt}")
         mix_voice_with_bgm(
             audio_path,
             audio_path,
@@ -889,9 +965,9 @@ def main() -> None:
     parser.add_argument(
         "--bgm-volume",
         type=float,
-        default=-18.0,
+        default=-16.0,
         metavar="DB",
-        help="BGM の音量（dB）。小さいほど小さい。デフォルト: -18",
+        help="BGM の音量（dB）。小さいほど小さい。デフォルト: -16",
     )
     parser.add_argument(
         "--bgm-style",
@@ -905,7 +981,7 @@ def main() -> None:
         type=str,
         default=None,
         metavar="TEXT",
-        help="MusicGen 用プロンプト。未指定時は soft piano gentle strings meditation",
+        help="MusicGen 用プロンプト。未指定時は候補からランダムに選択",
     )
 
     args = parser.parse_args()
