@@ -1,0 +1,15 @@
+---
+description: /git-commit 実行時に output/ を常にステージする。.specstory は除外する。
+alwaysApply: true
+---
+
+# git-commit 時のステージング
+
+このプロジェクトで **`/git-commit`** を実行するときは、次のようにステージングする。
+
+1. **常にステージする**: `output/` 以下（feed.xml、mp3、txt、artwork.png など）
+   - `git add output/`
+2. **変更があればステージする**: main.py, docs/, requirements.txt, .env.example, .gitignore, .gitattributes など
+3. **ステージしない**: `.specstory/`（Cursor の会話履歴）
+
+つまり、コミット対象の変更をステージする際は **`git add output/` を必ず含め**、コード・ドキュメントの変更とあわせてステージしてからコミットする。`.specstory/` は含めない。
