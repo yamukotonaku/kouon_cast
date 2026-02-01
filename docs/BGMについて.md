@@ -4,27 +4,26 @@
 
 ---
 
-## 方法 1: 手続き生成 BGM（標準・軽量）
+## 方法 1: 手続き生成 BGM（軽量・著作権フリー）
 
 **著作権フリー**の BGM をプログラムで自動生成し、音声に重ねます。
 
 - **仕組み**: 低音の正弦波を重ねたパッドに、**scipy** でローパスフィルタ（温かみ）とゆっくりした振幅のうねり（LFO）をかけ、落ち着いたアンビエントにしています。
 - **著作権**: コードで生成するため **著作権は発生しません**。個人利用・配信ともに利用可能です。
-- **使い方**（デフォルト）:
+- **使い方**: デフォルトは MusicGen のため、手続き BGM を使う場合は `--bgm-style procedural` を指定します。
   ```bash
-  python main.py --theme "慈悲" --add-bgm
+  python main.py --theme "慈悲" --bgm-style procedural
   ```
-- **音量**: BGM を小さくしたい場合は `--bgm-volume` で指定（単位は dB）。
+- **音量**: BGM を小さくしたい場合は `--bgm-volume` で指定（単位は dB）。デフォルトは `-20` dB です。
   ```bash
-  python main.py --theme "慈悲" --add-bgm --bgm-volume -24
+  python main.py --theme "慈悲" --bgm-volume -24
   ```
-  デフォルトは `-20` dB です。
 
 ---
 
-## 方法 2: AI 音楽生成（MusicGen）
+## 方法 2: AI 音楽生成（MusicGen）【デフォルト】
 
-より「曲らしい」BGM にしたい場合は、**--bgm-style musicgen** で Meta の MusicGen を使えます。
+**デフォルト**で、Meta の MusicGen により「曲らしい」BGM を自動追加します。
 
 - **前提**: NumPy を 1.x に揃え、`transformers` と `torch` をインストールする必要があります（GPU 推奨）。  
   **NumPy 2.x と PyTorch は互換性がないため、MusicGen 利用時は必ず NumPy 1.x にしてください。**
@@ -39,10 +38,11 @@
   ```
   これで `transformers` / `torch` / `accelerate` と NumPy 1.x が入り、MusicGen が利用可能になります。
 
-- **使い方**:
+- **使い方**（オプション指定なしで BGM 付き）:
   ```bash
-  python main.py --theme "慈悲" --add-bgm --bgm-style musicgen
+  python main.py --theme "慈悲"
   ```
+  BGM を付けない場合は `--no-bgm` を指定します。
 - **初回**: MusicGen のモデル（facebook/musicgen-small、約 2.4GB）が Hugging Face から自動ダウンロードされます。2 回目以降はキャッシュを使用します。
 - **プロンプト**: デフォルトは "calm ambient meditation peaceful soft pad no drums" です。コード内で変更可能です。
 - **ライセンス**: **CC-BY-NC（非商用）**。個人用ポッドキャストであれば利用可能な場合があります。利用前にライセンスを確認してください。
@@ -67,7 +67,8 @@
 
 | 方法 | オプション | 著作権 | 手軽さ | 音のイメージ |
 |------|-------------|--------|--------|----------------|
-| 手続き BGM | `--add-bgm`（既定） | なし | ◎ | ローパス＋LFO の落ち着いたパッド |
-| MusicGen | `--add-bgm --bgm-style musicgen` | CC-BY-NC | △（要 torch） | 曲っぽいアンビエント |
+| MusicGen | （既定・オプション不要） | CC-BY-NC | △（要 torch） | 曲っぽいアンビエント |
+| 手続き BGM | `--bgm-style procedural` | なし | ◎ | ローパス＋LFO の落ち着いたパッド |
+| BGM なし | `--no-bgm` | - | - | - |
 
-**自分用ポッドキャストで安全に使うなら、`--add-bgm` の手続き BGM を推奨します。** より良い感じにしたい場合は `--bgm-style musicgen` を試してください（要 transformers / torch）。
+**デフォルトは MusicGen で BGM を追加します。** 著作権を気にしない場合は手続き BGM（`--bgm-style procedural`）も利用できます。

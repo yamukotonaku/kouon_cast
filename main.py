@@ -532,11 +532,11 @@ def run_pipeline(
     stories_dir: Path | str = STORIES_DIR,
     output_dir: Path | str = OUTPUT_DIR,
     feed_path: Path | str = FEED_PATH,
-    speaker_id: int = 1,
+    speaker_id: int = 84,
     voicevox_url: str = "http://localhost:50021",
-    add_bgm: bool = False,
+    add_bgm: bool = True,
     bgm_volume_db: float = -20.0,
-    bgm_style: str = "procedural",
+    bgm_style: str = "musicgen",
 ) -> None:
     """説話生成 → 音声化 → RSS 更新まで一括実行する。"""
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -614,12 +614,14 @@ def main() -> None:
         epilog="""
 例:
   python main.py --theme "慈悲"
-  python main.py --theme "欲と知足" --speaker 3
+  python main.py --theme "欲と知足"  # デフォルト speaker 84
   python main.py --theme "忍辱" --voicevox-url http://127.0.0.1:50021
   python main.py --list-speakers
   python main.py --merge-wav "乾いた心に降る雨"  # 分割 WAV を 1 つの MP3 に結合
   python main.py --update-feed  # feed.xml のみ再生成（PODCAST_BASE_URL 反映・iPhone 用）
-  python main.py --theme "慈悲" --add-bgm  # 手続き生成BGMを追加（著作権フリー）
+  python main.py --theme "慈悲"  # デフォルトで MusicGen BGM を追加
+  python main.py --theme "慈悲" --no-bgm  # BGM なし
+  python main.py --theme "慈悲" --bgm-style procedural  # 手続き BGM（軽量・著作権フリー）
         """,
     )
     parser.add_argument(
@@ -631,8 +633,8 @@ def main() -> None:
     parser.add_argument(
         "--speaker",
         type=int,
-        default=1,
-        help="VOICEVOX のスピーカーID（デフォルト: 1）",
+        default=84,
+        help="VOICEVOX のスピーカーID（デフォルト: 84）",
     )
     parser.add_argument(
         "--voicevox-url",
@@ -670,9 +672,9 @@ def main() -> None:
         help="output 内の分割 WAV を結合し、feed.xml のみ再生成する（.env の PODCAST_BASE_URL を反映）。iPhone 用 URL 更新時に使用",
     )
     parser.add_argument(
-        "--add-bgm",
+        "--no-bgm",
         action="store_true",
-        help="音声に手続き生成BGMを重ねる（著作権フリー・自動生成）。",
+        help="BGM を追加しない（デフォルトは MusicGen で BGM を追加）",
     )
     parser.add_argument(
         "--bgm-volume",
@@ -685,8 +687,8 @@ def main() -> None:
         "--bgm-style",
         type=str,
         choices=["procedural", "musicgen"],
-        default="procedural",
-        help="BGM の生成方法: procedural=手続き（軽量・著作権フリー）, musicgen=AI（要 transformers/torch・CC-BY-NC）",
+        default="musicgen",
+        help="BGM の生成方法: musicgen=AI（デフォルト）, procedural=手続き（軽量・著作権フリー）",
     )
 
     args = parser.parse_args()
@@ -752,7 +754,7 @@ def main() -> None:
         feed_path=args.output_dir / "feed.xml",
         speaker_id=args.speaker,
         voicevox_url=args.voicevox_url,
-        add_bgm=args.add_bgm,
+        add_bgm=not args.no_bgm,
         bgm_volume_db=args.bgm_volume,
         bgm_style=args.bgm_style,
     )

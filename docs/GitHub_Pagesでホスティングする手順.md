@@ -95,7 +95,7 @@ git push -u origin main
 
 1. ローカルで説話を生成・音声化する  
    ```bash
-   python main.py --theme "慈悲" --add-bgm
+   python main.py --theme "慈悲"
    ```
 2. `PODCAST_BASE_URL` がすでに GitHub Pages の URL になっていれば、そのまま `output/feed.xml` も正しい URL で更新されます
 3. output をコミットして push  
