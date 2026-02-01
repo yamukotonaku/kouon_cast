@@ -9,6 +9,7 @@ AI仏教説話自動生成・Podcast配信システム
 
 import argparse
 import os
+import random
 import re
 import sys
 from pathlib import Path
@@ -28,6 +29,39 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 STORIES_DIR = PROJECT_ROOT / "stories"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 FEED_PATH = OUTPUT_DIR / "feed.xml"
+
+# テーマ未指定時にランダムで選ぶ候補（古典的な徳目＋少し意外なテーマ）
+RANDOM_THEMES = [
+    "慈悲",
+    "忍辱",
+    "知足",
+    "無常",
+    "因果",
+    "布施",
+    "智慧",
+    "欲と知足",
+    "執着を手放す",
+    "落ち葉と掃除僧",
+    "泥棒とお坊さん",
+    "一輪の花",
+    "空の茶碗",
+    "雨の日の托鉢",
+    "名前のない修行者",
+    "象と蟻の教え",
+    "壊れた鐘の音",
+    "旅の途中の出会い",
+    "川を渡る渡し守",
+    "灯りを消した部屋",
+    "一粒の米",
+    "老いた木と若い芽",
+    "沈黙の功徳",
+    "問わず語り",
+]
+
+
+def pick_random_theme() -> str:
+    """テーマ未指定時に使うランダムなテーマを返す。"""
+    return random.choice(RANDOM_THEMES)
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +109,8 @@ def generate_story(api_key: str, context: str, theme: str) -> dict[str, str]:
 与えられた既存の説話集を踏まえ、同じトーン・文体・教訓の流れで新しい説話を創作してください。
 出力は音声合成（TTS）に適するよう、ルビや振り仮名は一切付けず、句読点を適切に打ってください。
 必ず「タイトル」と「本文」の2つだけを、以下の形式で出力してください。余計な説明は不要です。
+
+【意外性】説話には、聞き手が「なるほど」「意外だ」と感じるようなひねりや視点の転換を織り交ぜてください。型通りの教訓だけでなく、予想外の登場人物（泥棒、子ども、動物、名もなき老人など）、逆説的な結末、身近な比喩や意外な対比を使うと、印象に残りやすくなります。古典の枠を守りつつ、少し意外性のある展開を心がけてください。
 
 【分量】本文はたっぷりの長さで書いてください。目安として2000字以上3500字程度（音声で約15分〜20分になる分量。短い説話の2〜2.5倍の長さ）とし、情景・登場人物の心の動き・対話・教訓が伝わるよう、丁寧にゆったりと展開してください。エピソードを増やしたり、会話や内心描写を厚くして、読み応えのある説話にしてください。
 
@@ -632,6 +668,7 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 例:
+  python main.py  # テーマをランダムに選択
   python main.py --theme "慈悲"
   python main.py --theme "欲と知足"  # デフォルト speaker 84
   python main.py --theme "忍辱" --voicevox-url http://127.0.0.1:50021
@@ -648,7 +685,7 @@ def main() -> None:
         "--theme",
         type=str,
         default="",
-        help="今回の説話のテーマ（例: 慈悲、忍辱、知足）",
+        help="今回の説話のテーマ（未指定時はランダムに選択。例: 慈悲、忍辱、知足）",
     )
     parser.add_argument(
         "--speaker",
@@ -773,11 +810,13 @@ def main() -> None:
             sys.exit(1)
         return
 
-    if not args.theme.strip():
-        parser.error("--theme を指定してください。例: --theme 慈悲")
+    theme = args.theme.strip()
+    if not theme:
+        theme = pick_random_theme()
+        print(f"テーマ未指定のため、ランダムに選びました: 「{theme}」")
 
     run_pipeline(
-        theme=args.theme.strip(),
+        theme=theme,
         stories_dir=args.stories_dir,
         output_dir=args.output_dir,
         feed_path=args.output_dir / "feed.xml",
