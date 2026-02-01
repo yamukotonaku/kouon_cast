@@ -14,7 +14,7 @@
   ```bash
   python main.py --theme "慈悲" --bgm-style procedural
   ```
-- **音量**: BGM を小さくしたい場合は `--bgm-volume` で指定（単位は dB）。デフォルトは `-20` dB です。
+- **音量**: BGM の音量は `--bgm-volume` で指定（単位は dB）。デフォルトは `-18` dB です。
   ```bash
   python main.py --theme "慈悲" --bgm-volume -24
   ```
@@ -44,7 +44,14 @@
   ```
   BGM を付けない場合は `--no-bgm` を指定します。
 - **初回**: MusicGen のモデル（facebook/musicgen-small、約 2.4GB）が Hugging Face から自動ダウンロードされます。2 回目以降はキャッシュを使用します。
-- **プロンプト**: デフォルトは "calm ambient meditation peaceful soft pad no drums" です。コード内で変更可能です。
+- **プロンプト**: デフォルトは "soft piano gentle strings meditation" です。
+- **テイストの変更**: `--bgm-prompt` で MusicGen のプロンプトを上書きできます。
+  ```bash
+  python main.py --theme "慈悲"  # デフォルト: soft piano gentle strings
+  python main.py --theme "慈悲" --bgm-prompt "zen temple bell ambient drone"
+  ```
+  英語のキーワード（calm, ambient, piano, strings, meditation, drone, no drums など）を並べると雰囲気を変えられます。
+- **音量**: BGM の音量は `--bgm-volume` で指定（単位は dB）。デフォルトは `-18` dB です。
 - **ライセンス**: **CC-BY-NC（非商用）**。個人用ポッドキャストであれば利用可能な場合があります。利用前にライセンスを確認してください。
 - **注意**: MusicGen が使えない環境（NumPy 2.x のまま・メモリ不足など）では、自動で手続き BGM にフォールバックします。
 

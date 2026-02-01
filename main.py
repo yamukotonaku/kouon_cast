@@ -329,7 +329,7 @@ def generate_procedural_bgm(
 
 def generate_musicgen_bgm(
     duration_sec: float,
-    prompt: str = "calm ambient meditation peaceful soft pad no drums",
+    prompt: str = "soft piano gentle strings meditation",
     model_id: str = "facebook/musicgen-small",
     sample_rate: int = 32000,
 ) -> "AudioSegment | None":
@@ -339,6 +339,7 @@ def generate_musicgen_bgm(
     NumPy 2.x と PyTorch の互換性問題などで失敗した場合は None を返し、呼び出し元で手続き BGM にフォールバックする。
     """
     try:
+        import numpy as np
         from transformers import AutoProcessor, MusicgenForConditionalGeneration
         import torch
     except ImportError:
@@ -405,12 +406,14 @@ def generate_musicgen_bgm(
 def mix_voice_with_bgm(
     voice_path: Path | str,
     output_path: Path | str,
-    bgm_volume_db: float = -20.0,
+    bgm_volume_db: float = -18.0,
     bgm_style: str = "procedural",
+    bgm_prompt: str | None = None,
 ) -> Path:
     """
     音声ファイルにBGMを重ねて出力する。
     bgm_style: "procedural"（手続き・著作権フリー） or "musicgen"（AI・要 transformers/torch、CC-BY-NC）
+    bgm_prompt: MusicGen 用のテキストプロンプト（デフォルト: soft piano gentle strings meditation）
     """
     from pydub import AudioSegment
 
@@ -421,7 +424,11 @@ def mix_voice_with_bgm(
     duration_sec = duration_ms / 1000.0
     bgm = None
     if bgm_style == "musicgen":
-        bgm = generate_musicgen_bgm(duration_sec, sample_rate=voice.frame_rate)
+        bgm = generate_musicgen_bgm(
+            duration_sec,
+            sample_rate=voice.frame_rate,
+            prompt=bgm_prompt or "soft piano gentle strings meditation",
+        )
         if bgm is not None:
             print("   BGM: MusicGen で生成しました。")
     if bgm is None:
@@ -535,8 +542,9 @@ def run_pipeline(
     speaker_id: int = 84,
     voicevox_url: str = "http://localhost:50021",
     add_bgm: bool = True,
-    bgm_volume_db: float = -20.0,
+    bgm_volume_db: float = -18.0,
     bgm_style: str = "musicgen",
+    bgm_prompt: str | None = None,
 ) -> None:
     """説話生成 → 音声化 → RSS 更新まで一括実行する。"""
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -585,6 +593,7 @@ def run_pipeline(
             audio_path,
             bgm_volume_db=bgm_volume_db,
             bgm_style=bgm_style,
+            bgm_prompt=bgm_prompt,
         )
         print(f"   BGM 付きで上書き: {audio_path}")
 
@@ -622,6 +631,7 @@ def main() -> None:
   python main.py --theme "慈悲"  # デフォルトで MusicGen BGM を追加
   python main.py --theme "慈悲" --no-bgm  # BGM なし
   python main.py --theme "慈悲" --bgm-style procedural  # 手続き BGM（軽量・著作権フリー）
+  python main.py --theme "慈悲" --bgm-prompt "soft piano gentle strings"  # MusicGen の雰囲気を変更
         """,
     )
     parser.add_argument(
@@ -679,9 +689,9 @@ def main() -> None:
     parser.add_argument(
         "--bgm-volume",
         type=float,
-        default=-20.0,
+        default=-18.0,
         metavar="DB",
-        help="BGM の音量（dB）。小さいほど小さい。デフォルト: -20",
+        help="BGM の音量（dB）。小さいほど小さい。デフォルト: -18",
     )
     parser.add_argument(
         "--bgm-style",
@@ -689,6 +699,13 @@ def main() -> None:
         choices=["procedural", "musicgen"],
         default="musicgen",
         help="BGM の生成方法: musicgen=AI（デフォルト）, procedural=手続き（軽量・著作権フリー）",
+    )
+    parser.add_argument(
+        "--bgm-prompt",
+        type=str,
+        default=None,
+        metavar="TEXT",
+        help="MusicGen 用プロンプト。未指定時は soft piano gentle strings meditation",
     )
 
     args = parser.parse_args()
@@ -757,6 +774,7 @@ def main() -> None:
         add_bgm=not args.no_bgm,
         bgm_volume_db=args.bgm_volume,
         bgm_style=args.bgm_style,
+        bgm_prompt=args.bgm_prompt,
     )
 
 
