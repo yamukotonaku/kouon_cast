@@ -7,9 +7,21 @@
     <itunes:explicit>no</itunes:explicit>
     <docs>http://www.rssboard.org/rss-specification</docs>
     <generator>python-podgen v1.1.0 https://podgen.readthedocs.org</generator>
-    <lastBuildDate>Sun, 01 Feb 2026 05:38:42 +0000</lastBuildDate>
-    <pubDate>Sun, 01 Feb 2026 05:32:08 +0000</pubDate>
+    <lastBuildDate>Sun, 01 Feb 2026 06:01:18 +0000</lastBuildDate>
+    <pubDate>Sun, 01 Feb 2026 06:01:18 +0000</pubDate>
     <itunes:image href="https://yamukotonaku.github.io/kouon_cast/artwork.png"/>
+    <item>
+      <title>絡繰り師と覚者の問い</title>
+      <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/絡繰り師と覚者の問い.mp3</guid>
+      <enclosure url="https://yamukotonaku.github.io/kouon_cast/絡繰り師と覚者の問い.mp3" length="2859500" type="audio/mpeg"/>
+      <pubDate>Sun, 01 Feb 2026 06:01:18 +0000</pubDate>
+    </item>
+    <item>
+      <title>同僚の出世が妬ましい 嫉妬の炎を鎮めるブッダの教え</title>
+      <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/同僚の出世が妬ましい_嫉妬の炎を鎮めるブッダの教え.mp3</guid>
+      <enclosure url="https://yamukotonaku.github.io/kouon_cast/同僚の出世が妬ましい_嫉妬の炎を鎮めるブッダの教え.mp3" length="5372876" type="audio/mpeg"/>
+      <pubDate>Sun, 01 Feb 2026 05:54:32 +0000</pubDate>
+    </item>
     <item>
       <title>倹約が人生を豊かにする</title>
       <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/倹約が人生を豊かにする.mp3</guid>
