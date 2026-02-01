@@ -12,6 +12,7 @@ import os
 import random
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -758,10 +759,12 @@ def run_pipeline(
         print(f"   サマリー: {summary[:60]}…" if len(summary) > 60 else f"   サマリー: {summary}")
 
     safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in story["title"])[:60]
-    audio_path = output_dir / f"{safe_title}.mp3"
+    date_str = datetime.now().strftime("%Y.%m.%d")
+    base_name = f"{date_str}_{safe_title}"
+    audio_path = output_dir / f"{base_name}.mp3"
 
     # 法話テキストを .txt で保存（サマリーがあれば「サマリー:」行を追加）
-    text_path = output_dir / f"{safe_title}.txt"
+    text_path = output_dir / f"{base_name}.txt"
     header_lines = [f"タイトル: {story['title']}"]
     if summary:
         header_lines.append(f"サマリー: {summary}")
