@@ -1,0 +1,20 @@
+# AI仏教説話自動生成・Podcast配信システム
+# Python 3.10+
+
+# Google Gen AI SDK (Gemini 2.5 Pro)
+google-genai>=1.0.0
+
+# 環境変数 (.env)
+python-dotenv>=1.0.0
+
+# Podcast RSS 生成
+podgen>=1.1.0
+
+# VOICEVOX API 呼び出し
+requests>=2.28.0
+
+# WAV 結合・MP3 変換（MP3 出力には ffmpeg のインストールが必要）
+pydub>=0.25.0
+
+# BGM 手続き生成（numpy で波形生成）
+numpy>=1.24.0

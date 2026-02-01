@@ -1,0 +1,17 @@
+# 環境変数（APIキーを含む）
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# 出力（必要に応じて feed.xml や音声は除外しない）
+# output/*.wav
+# output/*.mp3
+# output/feed.xml
