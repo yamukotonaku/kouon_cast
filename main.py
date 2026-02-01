@@ -197,6 +197,45 @@ def _parse_story_response(text: str) -> dict[str, str]:
     return {"title": title, "body": body}
 
 
+def generate_story_summary(api_key: str, title: str, body: str) -> str:
+    """
+    説話のタイトルと本文から、Podcast エピソード説明用の短いサマリーを Gemini で生成する。
+    戻り値: 2〜3文の要約（失敗時は空文字）
+    """
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=api_key)
+    prompt = f"""以下の仏教説話の要約を、2〜3文で書いてください。
+Podcast のエピソード説明（ショート説明）に使うため、聞き手が「どんな話か」を一目で分かるようにしてください。
+余計な前置きや「要約は以下の通りです」などの説明は不要です。要約文だけを出力してください。
+
+【タイトル】
+{title}
+
+【本文（抜粋）】
+{body[:8000] if len(body) > 8000 else body}
+"""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-pro",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.4,
+                max_output_tokens=512,
+            ),
+        )
+        text = _get_response_text(response)
+        summary = (text or "").strip()
+        # 1行にまとめて改行をスペースに（Podcast 説明向け）
+        if summary:
+            summary = " ".join(summary.split())
+        return summary[:1000] if summary else ""
+    except Exception:
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # 3. VOICEVOX 連携ロジック
 # ---------------------------------------------------------------------------
@@ -556,6 +595,9 @@ def update_podcast_feed(
             audio_files.append(f)
     audio_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
 
+    # エピソードのサマリー用: 同一 stem の .txt があれば本文の先頭を利用（最大文字数）
+    summary_max_chars = 500
+
     # podgen は .wav を標準で扱わないため、MIME タイプを明示する
     mime_by_ext = {".wav": "audio/wav", ".mp3": "audio/mpeg"}
     for i, audio_path in enumerate(audio_files):
@@ -568,6 +610,25 @@ def update_podcast_feed(
         e.title = title
         e.media = Media(media_url, size=size, type=media_type)
         e.publication_date = datetime.fromtimestamp(audio_path.stat().st_mtime, tz=timezone.utc)
+
+        # 同一名の .txt から物語サマリーを設定（Podcast アプリで表示される）
+        txt_path = output_dir / f"{audio_path.stem}.txt"
+        if txt_path.is_file():
+            try:
+                raw = txt_path.read_text(encoding="utf-8")
+                header = raw.split("\n\n", 1)[0] if "\n\n" in raw else raw
+                body = raw.split("\n\n", 1)[1].strip() if "\n\n" in raw else raw.strip()
+                summary = None
+                for line in header.split("\n"):
+                    line = line.strip()
+                    if line.startswith("サマリー:") or line.startswith("サマリー："):
+                        summary = (line.split(":", 1)[-1].split("：", 1)[-1].strip())
+                        break
+                if not summary:
+                    summary = body[:summary_max_chars] + ("…" if len(body) > summary_max_chars else "")
+                e.summary = summary
+            except Exception:
+                pass  # 読み込み失敗時はサマリーなしのまま
 
     p.rss_file(str(feed_path), minimize=False)
     return feed_path
@@ -610,13 +671,21 @@ def run_pipeline(
     story = generate_story(api_key, context, theme)
     print(f"   タイトル: {story['title']}")
 
+    # サマリーを Gemini で生成（Podcast エピソード説明用）
+    summary = generate_story_summary(api_key, story["title"], story["body"])
+    if summary:
+        print(f"   サマリー: {summary[:60]}…" if len(summary) > 60 else f"   サマリー: {summary}")
+
     safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in story["title"])[:60]
     audio_path = output_dir / f"{safe_title}.mp3"
 
-    # 法話テキストを .txt で保存
+    # 法話テキストを .txt で保存（サマリーがあれば「サマリー:」行を追加）
     text_path = output_dir / f"{safe_title}.txt"
+    header_lines = [f"タイトル: {story['title']}"]
+    if summary:
+        header_lines.append(f"サマリー: {summary}")
     text_path.write_text(
-        f"タイトル: {story['title']}\n\n{story['body']}",
+        "\n".join(header_lines) + "\n\n" + story["body"],
         encoding="utf-8",
     )
     print(f"   テキスト保存: {text_path}")
