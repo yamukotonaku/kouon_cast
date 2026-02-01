@@ -281,17 +281,17 @@ def generate_procedural_bgm(
 ) -> "AudioSegment":
     """
     著作権フリーの手続きBGMを生成する。
-    scipy でローパスフィルタ・ゆっくりした振幅変調（LFO）をかけ、
-    落ち着いたアンビエントパッドにする。
+    複数層の正弦波にデチューン・2段LFO・ローパスをかけ、
+    落ち着いたアンビエントパッドにする。numpy/scipy のみ使用。
     """
     import numpy as np
     from pydub import AudioSegment
     from scipy.signal import butter, sosfiltfilt
 
-    # 落ち着いた和音（ややデチューンで厚み）
+    # 基音＋ややデチューンした倍音で厚みとうねり（うなり）
     freqs = [55.0, 82.5, 110.0, 164.0, 220.0]
-    amps = [0.14, 0.09, 0.06, 0.04, 0.02]
-    fade_sec = 2.5
+    amps = [0.12, 0.08, 0.06, 0.04, 0.02]
+    fade_sec = 3.0
     n_loop = int(sample_rate * loop_sec)
     n_fade = int(sample_rate * fade_sec)
     t_loop = np.arange(n_loop, dtype=np.float64) / sample_rate
@@ -300,19 +300,23 @@ def generate_procedural_bgm(
     envelope[-n_fade:] = np.linspace(1, 0, n_fade)
     wave = np.zeros(n_loop)
     for f, a in zip(freqs, amps):
+        # 中心周波数とわずかにずらした2本でうなり・厚み
         wave += a * envelope * np.sin(2 * np.pi * f * t_loop)
-    # ゆっくりした振幅のうねり（LFO 約 0.03 Hz）
-    lfo = 0.92 + 0.08 * np.sin(2 * np.pi * 0.03 * t_loop)
-    wave = wave * lfo
+        wave += 0.4 * a * envelope * np.sin(2 * np.pi * (f * 1.004) * t_loop)
+        wave += 0.35 * a * envelope * np.sin(2 * np.pi * (f * 0.996) * t_loop)
+    # 2段LFOでゆっくりした振幅のうねり（有機的な動き）
+    lfo1 = 0.92 + 0.08 * np.sin(2 * np.pi * 0.028 * t_loop)
+    lfo2 = 0.96 + 0.04 * np.sin(2 * np.pi * 0.019 * t_loop + 0.5)
+    wave = wave * lfo1 * lfo2
     peak = np.abs(wave).max()
     if peak > 0:
-        wave = wave / peak * 0.38
+        wave = wave / peak * 0.36
     n_total = int(sample_rate * duration_sec)
     n_repeat = (n_total // n_loop) + 1
     full = np.tile(wave, n_repeat)[:n_total].astype(np.float64)
-    # ローパスフィルタで温かみ（カットオフ 約 600 Hz）
+    # ローパスで温かみ（カットオフ 約 750 Hz）
     nyq = sample_rate / 2.0
-    cutoff = 600.0 / nyq
+    cutoff = min(750.0 / nyq, 0.99)
     sos = butter(4, cutoff, btype="low", output="sos")
     full = sosfiltfilt(sos, full)
     peak = np.abs(full).max()

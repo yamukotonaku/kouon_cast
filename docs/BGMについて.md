@@ -8,7 +8,7 @@
 
 **著作権フリー**の BGM をプログラムで自動生成し、音声に重ねます。
 
-- **仕組み**: 低音の正弦波を重ねたパッドに、**scipy** でローパスフィルタ（温かみ）とゆっくりした振幅のうねり（LFO）をかけ、落ち着いたアンビエントにしています。
+- **仕組み**: 複数層の正弦波（基音＋わずかにデチューンした倍音で厚みとうねり）に、**2段の LFO** でゆっくりした振幅変調と **scipy** のローパスフィルタをかけ、落ち着いたアンビエントパッドにしています。追加依存はありません。
 - **著作権**: コードで生成するため **著作権は発生しません**。個人利用・配信ともに利用可能です。
 - **使い方**: デフォルトは MusicGen のため、手続き BGM を使う場合は `--bgm-style procedural` を指定します。
   ```bash
@@ -57,16 +57,19 @@
 
 ---
 
-## 方法 3: その他の AI 音楽（手動）
+## 方法 3: Python 音楽生成ライブラリ（手動）
 
-より「曲らしい」BGM にしたい場合は、**Meta の MusicGen** などで BGM を生成し、手動でミックスする方法があります。
+**Python で BGM を生成する**ライブラリを使い、手動でミックスする方法です。
+
+- **ambient-gen**（[PyPI](https://pypi.org/project/ambient-gen/) / [GitHub](https://github.com/beowulf-audio/ambient-gen-tui)）  
+  - アンビエント音楽を**生成**する Python ライブラリ。日本音階（平調子・陰旋・雲井・陽）対応。Pad / Flute / Vibraphone / Strings / Music Box の5層、リバーブ・Paulstretch 効果付き。  
+  - **ライセンス**: MIT。音源は同梱 soundfont のライセンスに従います（GPLv3 / MIT / Permissive など）。  
+  - **使い方**: `pip install ambient-gen` のあと、TUI で `ambient-gen` を起動し MP3 を生成。生成した MP3 を本プロジェクトの音声と pydub で手動ミックスする形になります。本パイプラインには標準では組み込んでいません。
 
 - **MusicGen (Meta AudioCraft)**  
   - テキストプロンプトから音楽を生成。  
-  - **ライセンス**: CC-BY-NC（**非商用**）。個人用ポッドキャストであれば利用可能な場合がありますが、利用前にライセンスを確認してください。  
-  - ローカル実行には PyTorch と GPU 推奨。Hugging Face の [MusicGen](https://huggingface.co/facebook/musicgen-melody) などで生成した WAV/MP3 を、本プロジェクトの `mix_voice_with_bgm` と同様の手順（pydub で音声と BGM を overlay）でミックスできます。
-
-本プロジェクトのパイプラインには標準では組み込んでいません。BGM ファイルを別途用意し、pydub で音声と重ねるスクリプトを自作する形になります。
+  - **ライセンス**: CC-BY-NC（**非商用**）。  
+  - Hugging Face の [MusicGen](https://huggingface.co/facebook/musicgen-melody) などで生成した WAV/MP3 を、pydub で音声と overlay してミックスできます。
 
 ---
 
