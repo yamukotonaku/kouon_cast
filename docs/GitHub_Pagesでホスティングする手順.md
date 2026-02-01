@@ -54,6 +54,30 @@ python main.py --update-feed
 
 これで `output/feed.xml` 内の音声 URL が、GitHub Pages のアドレスになります。
 
+### アートワークを設定する（任意）
+
+ポッドキャストのアートワーク（カバー画像）を表示したい場合:
+
+1. **画像を用意する**  
+   - 推奨サイズ: **1400×1400 px**（iTunes/Apple Podcasts の推奨）  
+   - 形式: PNG または JPG  
+   - ファイル名の例: `artwork.png`
+
+2. **output/ に置く**  
+   - 例: `output/artwork.png`  
+   - output をコミット・push すると GitHub Pages から `https://ユーザー名.github.io/kouon_cast/artwork.png` で配信されます。
+
+3. **.env に URL を設定する**  
+   ```bash
+   PODCAST_IMAGE_URL=https://あなたのユーザー名.github.io/kouon_cast/artwork.png
+   ```
+
+4. **feed.xml を再生成する**  
+   ```bash
+   python main.py --update-feed
+   ```
+   `output/feed.xml` に `<itunes:image>` が出力され、ポッドキャストアプリでアートワークが表示されます。
+
 ---
 
 ## 3. GitHub で Pages の公開元を「GitHub Actions」にする

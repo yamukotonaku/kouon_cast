@@ -488,10 +488,12 @@ def update_podcast_feed(
     podcast_description: str = "AIが生成する仏教説話を毎日お届けします。",
     podcast_website: str = "",
     podcast_base_url: str = "",
+    podcast_image_url: str = "",
 ) -> Path:
     """
     /output 内の音声ファイルをエピソードとして feed.xml を生成・更新する。
     podcast_base_url: 音声ファイルの公開URLのベース（例: https://example.com/podcast）
+    podcast_image_url: アートワーク画像のURL（未設定時は itunes:image を出力しない）。推奨 1400x1400 px。
     """
     from datetime import datetime, timezone
 
@@ -507,6 +509,8 @@ def update_podcast_feed(
     p.description = podcast_description
     p.website = podcast_website or "https://example.com"
     p.explicit = False
+    if podcast_image_url.strip():
+        p.image = podcast_image_url.strip()
 
     # output 内の音声ファイルを新しい順にエピソードとして追加（feed.xml 自体は除外）
     audio_extensions = {".wav", ".mp3"}
@@ -605,6 +609,7 @@ def run_pipeline(
     podcast_description = os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。")
     podcast_website = os.environ.get("PODCAST_WEBSITE", "")
     podcast_base_url = os.environ.get("PODCAST_BASE_URL", "")
+    podcast_image_url = os.environ.get("PODCAST_IMAGE_URL", "")
 
     print("4. Podcast RSS を更新しています...")
     update_podcast_feed(
@@ -614,6 +619,7 @@ def run_pipeline(
         podcast_description=podcast_description,
         podcast_website=podcast_website,
         podcast_base_url=podcast_base_url,
+        podcast_image_url=podcast_image_url,
     )
     print(f"   保存: {feed_path}")
 
@@ -726,6 +732,7 @@ def main() -> None:
             podcast_description=os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。"),
             podcast_website=os.environ.get("PODCAST_WEBSITE", ""),
             podcast_base_url=os.environ.get("PODCAST_BASE_URL", ""),
+            podcast_image_url=os.environ.get("PODCAST_IMAGE_URL", ""),
         )
         print(f"保存: {output_dir / 'feed.xml'}")
         print("完了しました。")
@@ -743,6 +750,7 @@ def main() -> None:
                 podcast_description=os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。"),
                 podcast_website=os.environ.get("PODCAST_WEBSITE", ""),
                 podcast_base_url=os.environ.get("PODCAST_BASE_URL", ""),
+                podcast_image_url=os.environ.get("PODCAST_IMAGE_URL", ""),
             )
             print("完了しました。")
         except FileNotFoundError as e:
