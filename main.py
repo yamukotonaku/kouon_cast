@@ -296,6 +296,10 @@ def generate_story(
 
 【職業・固有名詞の重複回避】参考コンテキスト（既存の説話集）にすでに登場している職業・立場・人名・地名は極力使わないでください。木工師・陶工・書記官・染物師・石工などが既出なら、農民、漁師、船頭、樵、鍛冶屋、楽師、医者、旅の商人、托鉢僧、王の側近、孤児、病人、名もなき老婆、猟師、筆写生、庭師、香商人など、まだ出ていない職業・立場を選んでください。人名・地名も既出と重複しないよう、インド風以外の名前や架空の国名・町名を交え、多様にしてください。
 
+【修行パート】説話には必ず修行のパートを含めてください。寺院や旅の途中で出会った僧侶の手ほどきで、瞑想や念仏・観想などの仏教修行を行います。その修行を積むことにより主人公が気づきを得て、人間的に成長するプロセスを丁寧に描いてください。
+
+【ブッダの登場】ブッダを直接的であるにせよ間接的であるにせよ、必ず登場させてください。直接の対話・説法、あるいは弟子や教えを通じた言及・逸話の形でも構いません。
+
 【分量】本文はたっぷりの長さで書いてください。目安として2000字以上3500字程度（音声で約15分〜20分になる分量。短い説話の2〜2.5倍の長さ）とし、情景・登場人物の心の動き・対話・教訓が伝わるよう、丁寧にゆったりと展開してください。エピソードを増やしたり、会話や内心描写を厚くして、読み応えのある説話にしてください。
 
 形式:
@@ -319,7 +323,7 @@ def generate_story(
 【今回のテーマ】
 {theme}
 
-上記テーマに沿い、説話集と仏教の知識を活用した新しい説話を1本、創作してください。重要: 上記の既存説話で既に使われている職業・人名・設定とは重複を避け、今回だけの意外性と多様性を出してください。説話の本文は、音声で約15分〜20分になる長さ（目安: 2000字〜3500字）で、情景・対話・教訓が伝わるよう丁寧にゆったりと書いてください。短い説話の2〜2.5倍の分量にしてください。"""
+上記テーマに沿い、説話集と仏教の知識を活用した新しい説話を1本、創作してください。必ず「修行パート」（寺院や僧侶の手ほどきで瞑想などの修行を積み、気づきと成長を得る流れ）と「ブッダの登場」（直接・間接どちらでも可）を含めてください。重要: 上記の既存説話で既に使われている職業・人名・設定とは重複を避け、今回だけの意外性と多様性を出してください。説話の本文は、音声で約15分〜20分になる長さ（目安: 2000字〜3500字）で、情景・対話・教訓が伝わるよう丁寧にゆったりと書いてください。短い説話の2〜2.5倍の分量にしてください。"""
 
     response = client.models.generate_content(
         model="gemini-2.5-pro",
@@ -447,15 +451,41 @@ def list_speakers(base_url: str = "http://localhost:50021") -> list[dict]:
     return r.json()
 
 
+def _apply_voicevox_speed_and_pause(audio_query: dict, speed_scale: float, pause_scale: float) -> None:
+    """
+    audio_query を破壊的に編集する。speedScale で速度を、pause_mora の長さで読点ブレークを調整する。
+    speed_scale: 1.0 が標準。0.87 で約15%遅く。
+    pause_scale: 1.0 が標準。大きくすると読点のポーズが長くなる。
+    """
+    key_speed = "speedScale" if "speedScale" in audio_query else "speed_scale"
+    if key_speed in audio_query:
+        audio_query[key_speed] = speed_scale
+    for phrase in audio_query.get("accent_phrases", []):
+        pause_mora = phrase.get("pause_mora")
+        if not pause_mora:
+            continue
+        moras = pause_mora if isinstance(pause_mora, list) else [pause_mora]
+        for mora in moras:
+            if not isinstance(mora, dict):
+                continue
+            for key in ("vowel_length", "consonant_length"):
+                if key in mora and isinstance(mora[key], (int, float)):
+                    mora[key] = max(0, int(mora[key] * pause_scale))
+
+
 def text_to_speech(
     text: str,
     output_path: Path | str,
     speaker_id: int = 1,
     base_url: str = "http://localhost:50021",
+    speed_scale: float = 0.87,
+    pause_scale: float = 1.8,
 ) -> Path:
     """
     テキストを VOICEVOX API で音声合成し、分割 WAV を結合して 1 つの MP3 に保存する。
     長文の場合は句点で分割して複数リクエストし、pydub で結合して MP3 出力する。
+    speed_scale: 1.0 が標準。0.87 で約15%遅く。
+    pause_scale: 読点などのポーズ長の倍率。1.8 で約1.8倍に延長。
     """
     import io
 
@@ -492,6 +522,7 @@ def text_to_speech(
         q = requests.post(query_url, params=params, timeout=30)
         q.raise_for_status()
         audio_query = q.json()
+        _apply_voicevox_speed_and_pause(audio_query, speed_scale=speed_scale, pause_scale=pause_scale)
         syn = requests.post(
             synthesis_url,
             params={"speaker": speaker_id},
