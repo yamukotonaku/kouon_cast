@@ -855,7 +855,7 @@ def merge_all_split_wavs_in_dir(output_dir: Path | str) -> None:
 def update_podcast_feed(
     output_dir: Path | str,
     feed_path: Path | str,
-    podcast_title: str = "仏教説話ポッドキャスト",
+    podcast_title: str = "香音キャスト ~仏教説話を音で読む~",
     podcast_description: str = "AIが生成する仏教説話を毎日お届けします。",
     podcast_website: str = "",
     podcast_base_url: str = "",
@@ -1029,7 +1029,7 @@ def run_pipeline(
         )
         print(f"   BGM 付きで上書き: {audio_path}")
 
-    podcast_title = os.environ.get("PODCAST_TITLE", "仏教説話ポッドキャスト")
+    podcast_title = os.environ.get("PODCAST_TITLE", "香音キャスト ~仏教説話を音で読む~")
     podcast_description = os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。")
     podcast_website = os.environ.get("PODCAST_WEBSITE", "")
     podcast_base_url = os.environ.get("PODCAST_BASE_URL", "")
@@ -1160,7 +1160,7 @@ def main() -> None:
         update_podcast_feed(
             output_dir,
             output_dir / "feed.xml",
-            podcast_title=os.environ.get("PODCAST_TITLE", "仏教説話ポッドキャスト"),
+            podcast_title=os.environ.get("PODCAST_TITLE", "香音キャスト ~仏教説話を音で読む~"),
             podcast_description=os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。"),
             podcast_website=os.environ.get("PODCAST_WEBSITE", ""),
             podcast_base_url=os.environ.get("PODCAST_BASE_URL", ""),
@@ -1178,7 +1178,7 @@ def main() -> None:
             update_podcast_feed(
                 output_dir,
                 output_dir / "feed.xml",
-                podcast_title=os.environ.get("PODCAST_TITLE", "仏教説話ポッドキャスト"),
+                podcast_title=os.environ.get("PODCAST_TITLE", "香音キャスト ~仏教説話を音で読む~"),
                 podcast_description=os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。"),
                 podcast_website=os.environ.get("PODCAST_WEBSITE", ""),
                 podcast_base_url=os.environ.get("PODCAST_BASE_URL", ""),
