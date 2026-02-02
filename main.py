@@ -304,8 +304,10 @@ def generate_story(
 
 【分量】本文はたっぷりの長さで書いてください。目安として2000字以上3500字程度（音声で約15分〜20分になる分量。短い説話の2〜2.5倍の長さ）とし、情景・登場人物の心の動き・対話・教訓が伝わるよう、丁寧にゆったりと展開してください。エピソードを増やしたり、会話や内心描写を厚くして、読み応えのある説話にしてください。
 
+【タイトル】説話のタイトルは、聞き手が「この話を聴くと何に役立つか」「どう心が変わるか」が端的に伝わるようにしてください。how-to 的・ベネフィット重視で、多少煽り気味でも構いません。抽象的・詩的な表現より、「〇〇が軽くなる」「〇〇を手放す」「〇〇が変わる」のように、得られる効果や変化が分かる表現を選んでください。長すぎず、15字〜25字程度を目安に。例：「嫉妬が消える、一粒の米」「怒りを手放す、最後の一椀」「聴くだけで心が軽くなる、旅人の選択」「欲ばりが報われない、三人の願い」。
+
 形式:
-タイトル: （ここに説話のタイトルを1行で）
+タイトル: （ここに説話のタイトルを1行で。上記【タイトル】の指示に従う）
 本文:
 （ここに説話の本文を書く。段落は空行で区切る）
 """
@@ -325,7 +327,7 @@ def generate_story(
 【今回のテーマ】
 {theme}
 
-上記テーマに沿い、説話集と仏教の知識を活用した新しい説話を1本、創作してください。必ず「修行パート」（寺院や僧侶の手ほどきで瞑想などの修行を積み、気づきと成長を得る流れ）と「ブッダの登場」（直接・間接どちらでも可）を含めてください。重要: 上記の既存説話で既に使われている職業・人名・設定とは重複を避け、今回だけの意外性と多様性を出してください。説話の本文は、音声で約15分〜20分になる長さ（目安: 2000字〜3500字）で、情景・対話・教訓が伝わるよう丁寧にゆったりと書いてください。短い説話の2〜2.5倍の分量にしてください。"""
+上記テーマに沿い、説話集と仏教の知識を活用した新しい説話を1本、創作してください。必ず「修行パート」（寺院や僧侶の手ほどきで瞑想などの修行を積み、気づきと成長を得る流れ）と「ブッダの登場」（直接・間接どちらでも可）を含めてください。重要: 上記の既存説話で既に使われている職業・人名・設定とは重複を避け、今回だけの意外性と多様性を出してください。説話の本文は、音声で約15分〜20分になる長さ（目安: 2000字〜3500字）で、情景・対話・教訓が伝わるよう丁寧にゆったりと書いてください。短い説話の2〜2.5倍の分量にしてください。タイトルは【タイトル】の指示に従い、「聴くと何に役立つか」が伝わるベネフィット重視の表現にしてください。"""
 
     response = client.models.generate_content(
         model="gemini-2.5-pro",
@@ -855,7 +857,7 @@ def merge_all_split_wavs_in_dir(output_dir: Path | str) -> None:
 def update_podcast_feed(
     output_dir: Path | str,
     feed_path: Path | str,
-    podcast_title: str = "香音キャスト ~仏教説話を音で読む~",
+    podcast_title: str = "香音キャスト 〜聴くだけで心が整う。仏教説話を音で〜",
     podcast_description: str = "AIが生成する仏教説話を毎日お届けします。",
     podcast_website: str = "",
     podcast_base_url: str = "",
@@ -1029,7 +1031,7 @@ def run_pipeline(
         )
         print(f"   BGM 付きで上書き: {audio_path}")
 
-    podcast_title = os.environ.get("PODCAST_TITLE", "香音キャスト ~仏教説話を音で読む~")
+    podcast_title = os.environ.get("PODCAST_TITLE", "香音キャスト 〜聴くだけで心が整う。仏教説話を音で〜")
     podcast_description = os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。")
     podcast_website = os.environ.get("PODCAST_WEBSITE", "")
     podcast_base_url = os.environ.get("PODCAST_BASE_URL", "")
@@ -1160,7 +1162,7 @@ def main() -> None:
         update_podcast_feed(
             output_dir,
             output_dir / "feed.xml",
-            podcast_title=os.environ.get("PODCAST_TITLE", "香音キャスト ~仏教説話を音で読む~"),
+            podcast_title=os.environ.get("PODCAST_TITLE", "香音キャスト 〜聴くだけで心が整う。仏教説話を音で〜"),
             podcast_description=os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。"),
             podcast_website=os.environ.get("PODCAST_WEBSITE", ""),
             podcast_base_url=os.environ.get("PODCAST_BASE_URL", ""),
@@ -1178,7 +1180,7 @@ def main() -> None:
             update_podcast_feed(
                 output_dir,
                 output_dir / "feed.xml",
-                podcast_title=os.environ.get("PODCAST_TITLE", "香音キャスト ~仏教説話を音で読む~"),
+                podcast_title=os.environ.get("PODCAST_TITLE", "香音キャスト 〜聴くだけで心が整う。仏教説話を音で〜"),
                 podcast_description=os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。"),
                 podcast_website=os.environ.get("PODCAST_WEBSITE", ""),
                 podcast_base_url=os.environ.get("PODCAST_BASE_URL", ""),

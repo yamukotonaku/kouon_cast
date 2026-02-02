@@ -1,15 +1,50 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
   <channel>
-    <title>仏教説話ポッドキャスト</title>
+    <title>香音キャスト ~仏教説話を音声で読む~</title>
     <link>https://example.com</link>
     <description>AIが生成する仏教説話を毎日お届けします。</description>
     <itunes:explicit>no</itunes:explicit>
     <docs>http://www.rssboard.org/rss-specification</docs>
     <generator>python-podgen v1.1.0 https://podgen.readthedocs.org</generator>
-    <lastBuildDate>Mon, 02 Feb 2026 19:54:11 +0000</lastBuildDate>
-    <pubDate>Mon, 02 Feb 2026 19:54:11 +0000</pubDate>
+    <lastBuildDate>Mon, 02 Feb 2026 22:48:19 +0000</lastBuildDate>
+    <pubDate>Mon, 02 Feb 2026 22:48:19 +0000</pubDate>
     <itunes:image href="https://yamukotonaku.github.io/kouon_cast/artwork.png"/>
+    <item>
+      <title>2026.02.03 薫香の跡 無我の風</title>
+      <description><![CDATA[古代ヴィーティカ国の都、チャンダナプラは、その名の通り「白檀の都」として、遠い西方の国々にまでその名を知られておりました。ガンジス河の支流に面したその都には、香木を商う店が軒を連ね、街角からは常に、馥郁たる香りが風に乗って漂っておりました。]]></description>
+      <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/2026.02.03_薫香の跡_無我の風.mp3</guid>
+      <enclosure url="https://yamukotonaku.github.io/kouon_cast/2026.02.03_薫香の跡_無我の風.mp3" length="4433996" type="audio/mpeg"/>
+      <pubDate>Mon, 02 Feb 2026 22:48:19 +0000</pubDate>
+    </item>
+    <item>
+      <title>2026.02.03 幻の蝶 慈悲の光</title>
+      <description><![CDATA[古代マユーラ国の都、チトラナガルは、その名の通り「絵の都」と呼ばれておりました。街角には腕利きの絵師たちが軒を連ね、その壁という壁は、神々や英雄たちの物語を描いた極彩色の壁画で埋め尽くされておりました。]]></description>
+      <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/2026.02.03_幻の蝶_慈悲の光.mp3</guid>
+      <enclosure url="https://yamukotonaku.github.io/kouon_cast/2026.02.03_幻の蝶_慈悲の光.mp3" length="4244396" type="audio/mpeg"/>
+      <pubDate>Mon, 02 Feb 2026 22:35:13 +0000</pubDate>
+    </item>
+    <item>
+      <title>2026.02.03 星読み師と最後の夜明け</title>
+      <description><![CDATA[古代ヴァルナ国の都、ジョーティスプラは、その名の通り「光の都」と呼ばれておりました。夜空には無数の星々が宝石のようにきらめき、人々は星の運行に自らの運命を重ね、祈りを捧げて暮らしておりました。]]></description>
+      <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/2026.02.03_星読み師と最後の夜明け.mp3</guid>
+      <enclosure url="https://yamukotonaku.github.io/kouon_cast/2026.02.03_星読み師と最後の夜明け.mp3" length="4129100" type="audio/mpeg"/>
+      <pubDate>Mon, 02 Feb 2026 20:59:14 +0000</pubDate>
+    </item>
+    <item>
+      <title>2026.02.03 傾いた天秤 慈悲の水</title>
+      <description><![CDATA[古代マールワ国の西に広がるタール砂漠は、旅人たちの間で「沈黙の海」と呼ばれておりました。黄金の砂丘がどこまでも続き、風が奏でる音以外には、何一つとして生命の気配を感じさせぬ、過酷な土地でございます。しかし、その砂漠を越えた先には、莫大な富を生むという西方の国々があり、一攫千金を夢見る商人たちは、危険を承知で、巨大な隊商を組んでこの砂漠を渡るのでした。]]></description>
+      <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/2026.02.03_傾いた天秤_慈悲の水.mp3</guid>
+      <enclosure url="https://yamukotonaku.github.io/kouon_cast/2026.02.03_傾いた天秤_慈悲の水.mp3" length="4049612" type="audio/mpeg"/>
+      <pubDate>Mon, 02 Feb 2026 20:33:49 +0000</pubDate>
+    </item>
+    <item>
+      <title>2026.02.03 沈黙の旋律 慈悲の余韻</title>
+      <description><![CDATA[古代ガンダルヴァ国の都、サンギータプラは、その名の通り「音楽の都」として、近隣諸国にその名を知られておりました。街角からは常にどこからか楽器の音が聞こえ、人々は歌うように語り、踊るように歩くとさえ言われておりました。]]></description>
+      <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/2026.02.03_沈黙の旋律_慈悲の余韻.mp3</guid>
+      <enclosure url="https://yamukotonaku.github.io/kouon_cast/2026.02.03_沈黙の旋律_慈悲の余韻.mp3" length="3862988" type="audio/mpeg"/>
+      <pubDate>Mon, 02 Feb 2026 20:24:53 +0000</pubDate>
+    </item>
     <item>
       <title>2026.02.03 太陽の子の影 慈悲の光</title>
       <description><![CDATA[古代アンガ国の東、七色の丘に抱かれたプラカーシャ渓谷は、その名の通り、一年を通じてまばゆい光に満ち溢れた土地でございました。この谷に、キランという名の若き農夫がおりました。彼の名は「光線」を意味し、その名の通り、彼が育てるひまわりは、常に太陽に向かって寸分の狂いもなくその大輪の花を開き、見る者の心を希望で満たすと評判でありました。]]></description>

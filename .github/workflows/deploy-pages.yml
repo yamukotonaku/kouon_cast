@@ -2,6 +2,10 @@
 # トリガー: main への push で output/** が変わったとき（feed.xml や mp3 をコミットしたあと）
 # 手動: Actions タブから "Run workflow" でも実行可能
 # 事前にリポジトリの Settings > Pages > Source を "GitHub Actions" に設定してください
+#
+# "job was not acquired by Runner" / "Internal server error" が出た場合:
+# GitHub 側の一時的な障害のことが多い。しばらく待ってから Actions で "Re-run all jobs" を試す。
+# https://www.githubstatus.com/ で Actions/Pages の障害を確認できる。
 
 name: Deploy Podcast to GitHub Pages
 
