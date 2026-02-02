@@ -31,6 +31,8 @@ STORIES_DIR = PROJECT_ROOT / "stories"
 KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge"  # 仏教の知識（Markdown）を置くディレクトリ
 OUTPUT_DIR = PROJECT_ROOT / "output"
 FEED_PATH = OUTPUT_DIR / "feed.xml"
+# VOICEVOX ユーザー辞書 CSV（未指定時はこのファイルがあれば読み込んで API で登録）
+VOICEVOX_USER_DICT_CSV = PROJECT_ROOT / "voicevox_user_dict.csv"
 
 # テーマ未指定時にランダムで選ぶ候補（大テーマ × 小テーマの組み合わせ）
 MAJOR_THEMES = [
@@ -451,26 +453,86 @@ def list_speakers(base_url: str = "http://localhost:50021") -> list[dict]:
     return r.json()
 
 
-def _apply_voicevox_speed_and_pause(audio_query: dict, speed_scale: float, pause_scale: float) -> None:
+def load_and_register_voicevox_user_dict(
+    csv_path: Path | str | None,
+    base_url: str = "http://localhost:50021",
+) -> int:
     """
-    audio_query を破壊的に編集する。speedScale で速度を、pause_mora の長さで読点ブレークを調整する。
+    voicevox_user_dict.csv を読み、VOICEVOX Engine API のユーザー辞書に一括登録する。
+    CSV 形式: 表記,読み(カタカナ/ひらがな),アクセント型[,優先度]
+    区切りはカンマまたはパイプ。1 行目はヘッダー可（表示名,読み仮名,アクセント型 など）。
+    ファイルが存在しない場合は何もせず 0 を返す。
+    登録できた単語数を返す。
+    """
+    import csv as csv_module
+    import requests
+
+    path = Path(csv_path) if csv_path else None
+    if not path or not path.is_file():
+        return 0
+
+    # 区切りを推定（最初の行でカンマかパイプか）
+    raw = path.read_text(encoding="utf-8")
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if not lines:
+        return 0
+
+    delimiter = "|" if "|" in lines[0] else ","
+    reader = csv_module.reader(lines, delimiter=delimiter)
+    rows = list(reader)
+    if not rows:
+        return 0
+
+    # ヘッダー行なら飛ばす（表示名 / surface / 読み仮名 などで判定）
+    start = 0
+    if len(rows[0]) >= 3 and rows[0][0].strip() in ("表示名", "surface", "表記", "単語"):
+        start = 1
+
+    count = 0
+    for i in range(start, len(rows)):
+        row = [c.strip() for c in rows[i]]
+        if len(row) < 3:
+            continue
+        surface, pronunciation, accent_s = row[0], row[1], row[2]
+        if not surface or not pronunciation:
+            continue
+        try:
+            accent_type = int(accent_s)
+        except ValueError:
+            continue
+        priority = 5
+        if len(row) >= 4 and row[3].strip().isdigit():
+            priority = max(1, min(10, int(row[3].strip())))
+
+        try:
+            r = requests.post(
+                f"{base_url}/user_dict_word",
+                params={
+                    "surface": surface,
+                    "pronunciation": pronunciation,
+                    "accent_type": accent_type,
+                    "priority": priority,
+                },
+                timeout=10,
+            )
+            if r.status_code in (200, 201):
+                count += 1
+            else:
+                print(f"   辞書登録スキップ: {surface} ({r.status_code})", file=sys.stderr)
+        except requests.RequestException as e:
+            print(f"   ユーザー辞書登録でエラー: {e}", file=sys.stderr)
+            break
+    return count
+
+
+def _apply_voicevox_speed(audio_query: dict, speed_scale: float) -> None:
+    """
+    audio_query を破壊的に編集する。speedScale で読み上げ速度を調整する。
     speed_scale: 1.0 が標準。0.87 で約15%遅く。
-    pause_scale: 1.0 が標準。大きくすると読点のポーズが長くなる。
     """
     key_speed = "speedScale" if "speedScale" in audio_query else "speed_scale"
     if key_speed in audio_query:
         audio_query[key_speed] = speed_scale
-    for phrase in audio_query.get("accent_phrases", []):
-        pause_mora = phrase.get("pause_mora")
-        if not pause_mora:
-            continue
-        moras = pause_mora if isinstance(pause_mora, list) else [pause_mora]
-        for mora in moras:
-            if not isinstance(mora, dict):
-                continue
-            for key in ("vowel_length", "consonant_length"):
-                if key in mora and isinstance(mora[key], (int, float)):
-                    mora[key] = max(0, int(mora[key] * pause_scale))
 
 
 def text_to_speech(
@@ -479,13 +541,13 @@ def text_to_speech(
     speaker_id: int = 1,
     base_url: str = "http://localhost:50021",
     speed_scale: float = 0.87,
-    pause_scale: float = 1.8,
+    sentence_break_ms: float = 500.0,
 ) -> Path:
     """
     テキストを VOICEVOX API で音声合成し、分割 WAV を結合して 1 つの MP3 に保存する。
     長文の場合は句点で分割して複数リクエストし、pydub で結合して MP3 出力する。
     speed_scale: 1.0 が標準。0.87 で約15%遅く。
-    pause_scale: 読点などのポーズ長の倍率。1.8 で約1.8倍に延長。
+    sentence_break_ms: 句点「。」で区切った区間のあいだに挿入する無音の長さ（ミリ秒）。「、」のポーズは変更しない。
     """
     import io
 
@@ -522,7 +584,7 @@ def text_to_speech(
         q = requests.post(query_url, params=params, timeout=30)
         q.raise_for_status()
         audio_query = q.json()
-        _apply_voicevox_speed_and_pause(audio_query, speed_scale=speed_scale, pause_scale=pause_scale)
+        _apply_voicevox_speed(audio_query, speed_scale=speed_scale)
         syn = requests.post(
             synthesis_url,
             params={"speaker": speaker_id},
@@ -535,12 +597,18 @@ def text_to_speech(
     if not wav_chunks:
         raise ValueError("音声データが生成されませんでした。")
 
-    # 全 WAV チャンクを結合して MP3 に出力
+    # 全 WAV チャンクを結合。区間のあいだ（句点の後）に無音を挿入して「。」のブレークを長くする
     segments = [
         AudioSegment.from_file(io.BytesIO(chunk), format="wav")
         for chunk in wav_chunks
     ]
-    combined = sum(segments, AudioSegment.empty())
+    if len(segments) == 1:
+        combined = segments[0]
+    else:
+        silence = AudioSegment.silent(duration=int(sentence_break_ms))
+        combined = segments[0]
+        for seg in segments[1:]:
+            combined = combined + silence + seg
     combined.export(str(output_path), format="mp3")
     if len(wav_chunks) > 1:
         print(f"   {len(wav_chunks)} 区間を結合して 1 つの MP3 にしました。")
@@ -875,8 +943,9 @@ def run_pipeline(
     knowledge_dir: Path | str = KNOWLEDGE_DIR,
     output_dir: Path | str = OUTPUT_DIR,
     feed_path: Path | str = FEED_PATH,
-    speaker_id: int = 84,
+    speaker_id: int = 9,
     voicevox_url: str = "http://localhost:50021",
+    user_dict_csv: Path | str | None = None,
     add_bgm: bool = True,
     bgm_volume_db: float = -14.0,
     bgm_style: str = "musicgen",
@@ -931,6 +1000,12 @@ def run_pipeline(
     )
     print(f"   テキスト保存: {text_path}")
 
+    # ユーザー辞書 CSV があれば VOICEVOX に登録（音声化の直前に実行）
+    csv_to_load = Path(user_dict_csv) if user_dict_csv is not None else VOICEVOX_USER_DICT_CSV
+    n = load_and_register_voicevox_user_dict(csv_to_load, base_url=voicevox_url)
+    if n > 0:
+        print(f"   VOICEVOX ユーザー辞書: {n} 語を登録しました。")
+
     print("3. VOICEVOX で音声化しています...")
     text_to_speech(
         story["body"],
@@ -983,7 +1058,7 @@ def main() -> None:
 例:
   python main.py  # テーマをランダムに選択
   python main.py --theme "慈悲"
-  python main.py --theme "欲と知足"  # デフォルト speaker 84
+  python main.py --theme "欲と知足"  # デフォルト speaker 9
   python main.py --theme "忍辱" --voicevox-url http://127.0.0.1:50021
   python main.py --list-speakers
   python main.py --merge-wav "乾いた心に降る雨"  # 分割 WAV を 1 つの MP3 に結合
@@ -1003,14 +1078,21 @@ def main() -> None:
     parser.add_argument(
         "--speaker",
         type=int,
-        default=84,
-        help="VOICEVOX のスピーカーID（デフォルト: 84）",
+        default=9,
+        help="VOICEVOX のスピーカーID（デフォルト: 9）",
     )
     parser.add_argument(
         "--voicevox-url",
         type=str,
         default="http://localhost:50021",
         help="VOICEVOX Engine の URL（デフォルト: http://localhost:50021）",
+    )
+    parser.add_argument(
+        "--voicevox-user-dict",
+        type=Path,
+        default=None,
+        metavar="CSV",
+        help="VOICEVOX ユーザー辞書用 CSV（表記,読み,アクセント型[,優先度]）。未指定時は voicevox_user_dict.csv があれば使用",
     )
     parser.add_argument(
         "--stories-dir",
@@ -1131,10 +1213,12 @@ def main() -> None:
     run_pipeline(
         theme=theme,
         stories_dir=args.stories_dir,
+        knowledge_dir=getattr(args, "knowledge_dir", KNOWLEDGE_DIR),
         output_dir=args.output_dir,
         feed_path=args.output_dir / "feed.xml",
         speaker_id=args.speaker,
         voicevox_url=args.voicevox_url,
+        user_dict_csv=args.voicevox_user_dict,
         add_bgm=not args.no_bgm,
         bgm_volume_db=args.bgm_volume,
         bgm_style=args.bgm_style,
