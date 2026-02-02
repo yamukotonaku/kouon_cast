@@ -1,5 +1,6 @@
 # GitHub Pages に output/ を自動デプロイする
-# トリガー: main ブランチへの push（output/ をコミットしたあと）
+# トリガー: main への push で output/** が変わったとき（feed.xml や mp3 をコミットしたあと）
+# 手動: Actions タブから "Run workflow" でも実行可能
 # 事前にリポジトリの Settings > Pages > Source を "GitHub Actions" に設定してください
 
 name: Deploy Podcast to GitHub Pages
@@ -8,8 +9,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'output/**'
-  workflow_dispatch:
+      - 'output/**'   # output/ 以下が変わらない push では実行されない（feed 更新時は必ず output/ をコミットして push）
+  workflow_dispatch:  # 手動で再デプロイしたいときに使用
 
 permissions:
   contents: read
