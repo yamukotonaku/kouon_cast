@@ -1,15 +1,22 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
   <channel>
-    <title>香音キャスト ~仏教説話を音声で読む~</title>
+    <title>仏教説話ポッドキャスト</title>
     <link>https://example.com</link>
     <description>AIが生成する仏教説話を毎日お届けします。</description>
     <itunes:explicit>no</itunes:explicit>
     <docs>http://www.rssboard.org/rss-specification</docs>
     <generator>python-podgen v1.1.0 https://podgen.readthedocs.org</generator>
-    <lastBuildDate>Mon, 02 Feb 2026 19:26:12 +0000</lastBuildDate>
-    <pubDate>Mon, 02 Feb 2026 19:26:12 +0000</pubDate>
+    <lastBuildDate>Mon, 02 Feb 2026 19:54:11 +0000</lastBuildDate>
+    <pubDate>Mon, 02 Feb 2026 19:54:11 +0000</pubDate>
     <itunes:image href="https://yamukotonaku.github.io/kouon_cast/artwork.png"/>
+    <item>
+      <title>2026.02.03 太陽の子の影 慈悲の光</title>
+      <description><![CDATA[古代アンガ国の東、七色の丘に抱かれたプラカーシャ渓谷は、その名の通り、一年を通じてまばゆい光に満ち溢れた土地でございました。この谷に、キランという名の若き農夫がおりました。彼の名は「光線」を意味し、その名の通り、彼が育てるひまわりは、常に太陽に向かって寸分の狂いもなくその大輪の花を開き、見る者の心を希望で満たすと評判でありました。]]></description>
+      <guid isPermaLink="false">https://yamukotonaku.github.io/kouon_cast/2026.02.03_太陽の子の影_慈悲の光.mp3</guid>
+      <enclosure url="https://yamukotonaku.github.io/kouon_cast/2026.02.03_太陽の子の影_慈悲の光.mp3" length="4421708" type="audio/mpeg"/>
+      <pubDate>Mon, 02 Feb 2026 19:54:11 +0000</pubDate>
+    </item>
     <item>
       <title>2026.02.03 旱魃の裁き 慈悲の雨</title>
       <description><![CDATA[古代コーサラ国の南端、ヴィンディヤの山々に抱かれたシューシュカ村は、その名の通り、常に乾ききっておりました。赤土の大地はひび割れ、川は痩せ細り、人々は空を見上げては、まだ来ぬ雨を乞い、ため息をつくのが常でございました。]]></description>
