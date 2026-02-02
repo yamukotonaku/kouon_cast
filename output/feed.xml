@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
   <channel>
-    <title>仏教説話ポッドキャスト</title>
+    <title>香音キャスト ~仏教説話を音声で読む~</title>
     <link>https://example.com</link>
     <description>AIが生成する仏教説話を毎日お届けします。</description>
     <itunes:explicit>no</itunes:explicit>
