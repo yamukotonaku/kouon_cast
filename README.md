@@ -7,7 +7,7 @@ AI が生成する仏教説話を VOICEVOX で音声化し、Podcast として�
 ## 必要な環境
 
 - **Python 3.10+**
-- **Google Gemini API キー**（[Google AI Studio](https://aistudio.google.com/apikey) で取得）
+- **説話生成**: **Google Gemini API キー**（[Google AI Studio](https://aistudio.google.com/apikey) で取得）**または** ローカル **Ollama**（[公式](https://ollama.com/)）。`--story-llm ollama` のときは Gemini キー不要
 - **VOICEVOX**（[公式](https://voicevox.hiroshiba.jp/)）を起動し、Engine API が `http://localhost:50021` で動いていること
 - **ffmpeg**（MP3 出力用。`pydub` が使用）
 
@@ -25,10 +25,11 @@ pip install -r requirements.txt
 
 # 環境変数を設定（.env.example をコピーして編集）
 cp .env.example .env
-# .env に GEMINI_API_KEY を記入
+# Gemini で説話生成する場合のみ: .env に GEMINI_API_KEY を記入
+# Ollama で説話生成する場合（--story-llm ollama）は API キー不要
 ```
 
-VOICEVOX を起動した状態で、以下を実行すると説話が 1 本生成され、`output/` にテキスト・MP3・feed.xml が出力されます。
+VOICEVOX を起動した状態で、以下を実行すると説話が 1 本生成され、`output/` にテキスト・MP3・feed.xml が出力されます。Ollama を使う場合は事前に `ollama pull llama3.2` などでモデルを取得し、Ollama を起動しておいてください。
 
 ---
 
@@ -53,6 +54,9 @@ python main.py --theme "忍辱 — 雨の日、誰かに傘を差す／差され
 | オプション | 説明 |
 |-----------|------|
 | `--theme "テーマ"` | 説話のテーマを指定（未指定時はランダム） |
+| `--story-llm gemini\|ollama` | 説話生成に使う LLM（デフォルト: gemini）。`ollama` でローカル Ollama を使用 |
+| `--ollama-url URL` | Ollama API の URL（`--story-llm ollama` 時。デフォルト: http://localhost:11434） |
+| `--ollama-model MODEL` | Ollama のモデル名（`--story-llm ollama` 時。デフォルト: llama3.2） |
 | `--no-bgm` | BGM を付けない |
 | `--bgm-style procedural` | BGM を手続き生成に（MusicGen 不要・軽量） |
 | `--speaker 9` | VOICEVOX のスピーカー ID（デフォルト: 9） |

@@ -375,26 +375,10 @@ def load_knowledge_text(knowledge_dir: Path | str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 2. Gemini 連携ロジック
+# 2. 説話生成ロジック（Gemini / Ollama 共通プロンプト）
 # ---------------------------------------------------------------------------
 
-
-def generate_story(
-    api_key: str,
-    context: str,
-    theme: str,
-    knowledge_context: str = "",
-) -> dict[str, str]:
-    """
-    仏教説話の編纂者として、コンテキスト・テーマ・仏教の知識から新説話を生成する。
-    戻り値: {"title": "タイトル", "body": "本文"}
-    """
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=api_key)
-
-    system_instruction = """あなたは仏教説話の編纂者です。
+STORY_SYSTEM_INSTRUCTION = """あなたは仏教説話の編纂者です。
 与えられた既存の説話集と仏教の知識を踏まえ、同じトーン・文体・教訓の流れで新しい説話を創作してください。仏教の知識（教義・用語・故事など）を活用し、説話に深みと教養を反映してください。
 出力は音声合成（TTS）に適するよう、ルビや振り仮名は一切付けず、句読点を適切に打ってください。
 必ず「タイトル」と「本文」の2つだけを、以下の形式で出力してください。余計な説明は不要です。
@@ -417,13 +401,18 @@ def generate_story(
 （ここに説話の本文を書く。段落は空行で区切る）
 """
 
-    # コンテキスト長の配分（説話集優先、知識は残り）
-    context_max = 400000
-    knowledge_max = 100000
+
+def _build_story_prompt(
+    context: str,
+    theme: str,
+    knowledge_context: str = "",
+    context_max: int = 400000,
+    knowledge_max: int = 100000,
+) -> str:
+    """説話生成用のユーザープロンプトを組み立てる。Gemini / Ollama 共通。"""
     context_truncated = (context[:context_max] if context else "（説話がまだ登録されていません。一般的な仏教説話のスタイルで創作してください。）")
     knowledge_truncated = (knowledge_context[:knowledge_max] if knowledge_context else "")
-
-    prompt = f"""【既存の説話集（参考コンテキスト）】
+    return f"""【既存の説話集（参考コンテキスト）】
 {context_truncated}
 
 【仏教の知識（参考・活用すること）】
@@ -434,11 +423,28 @@ def generate_story(
 
 上記テーマに沿い、説話集と仏教の知識を活用した新しい説話を1本、創作してください。必ず「修行パート」（寺院や僧侶の手ほどきで瞑想などの修行を積み、気づきと成長を得る流れ）と「ブッダの登場」（直接・間接どちらでも可）を含めてください。重要: 上記の既存説話で既に使われている職業・人名・設定とは重複を避け、今回だけの意外性と多様性を出してください。説話の本文は、音声で約15分〜20分になる長さ（目安: 2000字〜3500字）で、情景・対話・教訓が伝わるよう丁寧にゆったりと書いてください。短い説話の2〜2.5倍の分量にしてください。タイトルは【タイトル】の指示に従い、「聴くと何に役立つか」が伝わるベネフィット重視の表現にしてください。"""
 
+
+def generate_story(
+    api_key: str,
+    context: str,
+    theme: str,
+    knowledge_context: str = "",
+) -> dict[str, str]:
+    """
+    仏教説話の編纂者として、コンテキスト・テーマ・仏教の知識から新説話を生成する（Gemini 使用）。
+    戻り値: {"title": "タイトル", "body": "本文"}
+    """
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=api_key)
+    prompt = _build_story_prompt(context, theme, knowledge_context)
+
     response = client.models.generate_content(
         model="gemini-2.5-pro",
         contents=prompt,
         config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
+            system_instruction=STORY_SYSTEM_INSTRUCTION,
             temperature=0.8,
             max_output_tokens=16384,
         ),
@@ -455,6 +461,62 @@ def generate_story(
         if finish_reason == 2:
             msg += " （出力トークン上限に達した可能性があります。max_output_tokens を増やすか、コンテキストを短くしてください。）"
         raise RuntimeError(msg)
+    return _parse_story_response(text)
+
+
+def generate_story_ollama(
+    base_url: str = "http://localhost:11434",
+    model: str = "llama3.2",
+    context: str = "",
+    theme: str = "",
+    knowledge_context: str = "",
+    context_max: int = 100000,
+    knowledge_max: int = 50000,
+    connect_timeout: int = 15,
+    read_timeout: int = 600,
+) -> dict[str, str]:
+    """
+    仏教説話の編纂者として、コンテキスト・テーマ・仏教の知識から新説話を生成する（Ollama 使用）。
+    戻り値: {"title": "タイトル", "body": "本文"}
+    """
+    import requests
+
+    prompt = _build_story_prompt(
+        context, theme, knowledge_context,
+        context_max=context_max,
+        knowledge_max=knowledge_max,
+    )
+    url = base_url.rstrip("/") + "/api/generate"
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "system": STORY_SYSTEM_INSTRUCTION,
+        "stream": False,
+        "options": {"temperature": 0.8, "num_predict": 8192},
+    }
+    try:
+        r = requests.post(
+            url,
+            json=payload,
+            timeout=(connect_timeout, read_timeout),
+        )
+    except requests.exceptions.ConnectTimeout as e:
+        raise RuntimeError(
+            f"Ollama への接続がタイムアウトしました（{connect_timeout}秒）。"
+            f" --ollama-url のホストが起動しているか、ファイアウォールやネットワークを確認してください。URL: {url}"
+        ) from e
+    except requests.exceptions.ConnectionError as e:
+        msg = (
+            f"Ollama に接続できません（接続拒否）。URL: {url}\n"
+            "  - Ollama を起動していますか？（例: ターミナルで ollama serve）\n"
+            "  - ポートは合っていますか？Ollama の既定は 11434 です（--ollama-url http://localhost:11434）"
+        )
+        raise RuntimeError(msg) from e
+    r.raise_for_status()
+    data = r.json()
+    text = (data.get("response") or "").strip()
+    if not text:
+        raise RuntimeError("Ollama が空の応答を返しました。モデルやコンテキスト長を確認してください。")
     return _parse_story_response(text)
 
 
@@ -475,7 +537,7 @@ def _get_response_text(response) -> str:
 
 
 def _parse_story_response(text: str) -> dict[str, str]:
-    """Gemini の応答から「タイトル」と「本文」を抽出する。"""
+    """Gemini / Ollama の応答から「タイトル」と「本文」を抽出する。"""
     title = ""
     body = ""
     lines = text.strip().split("\n")
@@ -496,10 +558,23 @@ def _parse_story_response(text: str) -> dict[str, str]:
             body_lines.append(line)
 
     body = "\n".join(body_lines).strip()
-    if not title:
-        title = "説話"
     if not body:
         body = text.strip()
+
+    # 「タイトル:」行が無い場合（Ollama が ## 【…】 形式で返す場合）、先頭行からタイトルを抽出
+    if not title and body:
+        first_line = body.split("\n")[0].strip()
+        if first_line.startswith("## ") and "【" in first_line and "】" in first_line:
+            title = first_line.replace("## ", "", 1).strip()
+            rest_lines = body.split("\n")[1:]
+            body = "\n".join(rest_lines).strip()
+        elif first_line.startswith("## "):
+            title = first_line.replace("## ", "", 1).strip()
+            rest_lines = body.split("\n")[1:]
+            body = "\n".join(rest_lines).strip()
+
+    if not title:
+        title = "説話"
     return {"title": title, "body": body}
 
 
@@ -682,24 +757,34 @@ def text_to_speech(
         parts = [text]
 
     wav_chunks: list[bytes] = []
-    for part in parts:
-        if not part.strip():
-            continue
-        query_url = f"{base_url}/audio_query"
-        synthesis_url = f"{base_url}/synthesis"
-        params = {"text": part, "speaker": speaker_id}
-        q = requests.post(query_url, params=params, timeout=30)
-        q.raise_for_status()
-        audio_query = q.json()
-        _apply_voicevox_speed(audio_query, speed_scale=speed_scale)
-        syn = requests.post(
-            synthesis_url,
-            params={"speaker": speaker_id},
-            json=audio_query,
-            timeout=60,
+    try:
+        for part in parts:
+            if not part.strip():
+                continue
+            query_url = f"{base_url}/audio_query"
+            synthesis_url = f"{base_url}/synthesis"
+            params = {"text": part, "speaker": speaker_id}
+            q = requests.post(query_url, params=params, timeout=30)
+            q.raise_for_status()
+            audio_query = q.json()
+            _apply_voicevox_speed(audio_query, speed_scale=speed_scale)
+            syn = requests.post(
+                synthesis_url,
+                params={"speaker": speaker_id},
+                json=audio_query,
+                timeout=60,
+            )
+            syn.raise_for_status()
+            wav_chunks.append(syn.content)
+    except requests.exceptions.ConnectionError as e:
+        msg = (
+            f"VOICEVOX に接続できません（接続拒否）。\n"
+            f"  VOICEVOX Engine は起動していますか？ 既定のポートは 50021 です。\n"
+            f"  指定している URL: {base_url}\n"
+            f"  ネットワークや --voicevox-url の設定を確認してください。"
         )
-        syn.raise_for_status()
-        wav_chunks.append(syn.content)
+        print(msg, file=sys.stderr)
+        raise SystemExit(1) from e
 
     if not wav_chunks:
         raise ValueError("音声データが生成されませんでした。")
@@ -1053,16 +1138,22 @@ def run_pipeline(
     speaker_id: int = 9,
     voicevox_url: str = "http://localhost:50021",
     user_dict_csv: Path | str | None = None,
+    story_llm: str = "gemini",
+    ollama_url: str = "http://localhost:11434",
+    ollama_model: str = "llama3.2",
     add_bgm: bool = True,
     bgm_volume_db: float = -14.0,
     bgm_style: str = "musicgen",
     bgm_prompt: str | None = None,
 ) -> None:
     """説話生成 → 音声化 → RSS 更新まで一括実行する。"""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print("環境変数 GEMINI_API_KEY が設定されていません。.env を確認してください。", file=sys.stderr)
-        sys.exit(1)
+    if story_llm == "gemini":
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            print("環境変数 GEMINI_API_KEY が設定されていません。.env を確認してください。", file=sys.stderr)
+            sys.exit(1)
+    else:
+        api_key = None
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1080,14 +1171,24 @@ def run_pipeline(
     knowledge_context = load_knowledge_text(knowledge_dir)
     print(f"   説話: {len(context)} 文字 / 知識: {len(knowledge_context)} 文字")
 
-    print("2. Gemini で説話を生成しています...")
-    story = generate_story(api_key, context, theme, knowledge_context=knowledge_context)
-    print(f"   タイトル: {story['title']}")
+    if story_llm == "ollama":
+        print(f"2. Ollama（{ollama_model}）で説話を生成しています...")
+        story = generate_story_ollama(
+            base_url=ollama_url,
+            model=ollama_model,
+            context=context,
+            theme=theme,
+            knowledge_context=knowledge_context,
+        )
+        summary = (story["body"][:400].strip() + ("…" if len(story["body"]) > 400 else "")) if story.get("body") else ""
+    else:
+        print("2. Gemini で説話を生成しています...")
+        story = generate_story(api_key, context, theme, knowledge_context=knowledge_context)
+        summary = generate_story_summary(api_key, story["title"], story["body"])
+        if not summary and story["body"]:
+            summary = story["body"][:400].strip() + ("…" if len(story["body"]) > 400 else "")
 
-    # サマリーを Gemini で生成（Podcast の description 用）。失敗時は本文冒頭をフォールバック
-    summary = generate_story_summary(api_key, story["title"], story["body"])
-    if not summary and story["body"]:
-        summary = story["body"][:400].strip() + ("…" if len(story["body"]) > 400 else "")
+    print(f"   タイトル: {story['title']}")
     if summary:
         print(f"   サマリー: {summary[:60]}…" if len(summary) > 60 else f"   サマリー: {summary}")
 
@@ -1174,6 +1275,7 @@ def main() -> None:
   python main.py --theme "慈悲" --no-bgm  # BGM なし
   python main.py --theme "慈悲" --bgm-style procedural  # 手続き BGM（軽量・著作権フリー）
   python main.py --theme "慈悲" --bgm-prompt "soft piano gentle strings"  # MusicGen の雰囲気を変更
+  python main.py --story-llm ollama --ollama-model llama3.2  # 説話生成をローカル Ollama で実行
         """,
     )
     parser.add_argument(
@@ -1200,6 +1302,26 @@ def main() -> None:
         default=None,
         metavar="CSV",
         help="VOICEVOX ユーザー辞書用 CSV（表記,読み,アクセント型[,優先度]）。未指定時は voicevox_user_dict.csv があれば使用",
+    )
+    parser.add_argument(
+        "--story-llm",
+        type=str,
+        choices=["gemini", "ollama"],
+        default="gemini",
+        help="説話生成に使う LLM: gemini（デフォルト）, ollama（ローカル）",
+    )
+    parser.add_argument(
+        "--ollama-url",
+        type=str,
+        default="http://localhost:11434",
+        help="Ollama API の URL（--story-llm ollama 時。デフォルト: http://localhost:11434）",
+    )
+    parser.add_argument(
+        "--ollama-model",
+        type=str,
+        default="llama3.2",
+        metavar="MODEL",
+        help="Ollama のモデル名（--story-llm ollama 時。デフォルト: llama3.2）",
     )
     parser.add_argument(
         "--stories-dir",
@@ -1326,6 +1448,9 @@ def main() -> None:
         speaker_id=args.speaker,
         voicevox_url=args.voicevox_url,
         user_dict_csv=args.voicevox_user_dict,
+        story_llm=args.story_llm,
+        ollama_url=args.ollama_url,
+        ollama_model=args.ollama_model,
         add_bgm=not args.no_bgm,
         bgm_volume_db=args.bgm_volume,
         bgm_style=args.bgm_style,
