@@ -83,7 +83,7 @@ python main.py --update-feed
 
 本番の feed は GitHub Pages で配信しています。Podcast アプリで次の URL を登録すると、エピソード一覧と音声を取得できます。
 
-- **RSS（feed）URL**:  
+- **RSS（feed）URL**:
   **https://yamukotonaku.github.io/kouon_cast/feed.xml**
 
 ### 登録手順の例
