@@ -1245,6 +1245,137 @@ def update_podcast_feed(
 # ---------------------------------------------------------------------------
 
 
+def get_txt_only_files(output_dir: Path | str) -> list[Path]:
+    """output_dir 内で、対応する .mp3 が存在しない .txt のパスを返す。"""
+    output_dir = Path(output_dir)
+    if not output_dir.is_dir():
+        return []
+    result = []
+    for txt_path in output_dir.glob("*.txt"):
+        mp3_path = txt_path.with_suffix(".mp3")
+        if not mp3_path.exists():
+            result.append(txt_path)
+    return result
+
+
+def parse_output_txt(text_path: Path | str) -> dict:
+    """
+    output 用 .txt（タイトル:/サマリー: ヘッダ + 本文）をパースする。
+    戻り値: {"title": str, "summary": str | None, "body": str}
+    """
+    text_path = Path(text_path)
+    raw = text_path.read_text(encoding="utf-8")
+    title = ""
+    summary = None
+    body = ""
+    lines = raw.split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("タイトル:"):
+            title = line.removeprefix("タイトル:").strip()
+            i += 1
+            continue
+        if line.startswith("サマリー:"):
+            summary = line.removeprefix("サマリー:").strip()
+            i += 1
+            continue
+        # 空行の後が本文
+        if line.strip() == "" and i + 1 < len(lines):
+            body = "\n".join(lines[i + 1 :]).strip()
+            break
+        i += 1
+    if not body and title:
+        # ヘッダ行のみで区切りのない場合: 最初の空行までをスキップして残りを body に
+        for j, ln in enumerate(lines):
+            if ln.strip() == "" and j + 1 < len(lines):
+                body = "\n".join(lines[j + 1 :]).strip()
+                break
+    return {"title": title or text_path.stem, "summary": summary, "body": body}
+
+
+def run_mp3_only_pipeline(
+    text_path: Path | str,
+    output_dir: Path | str,
+    feed_path: Path | str,
+    speaker_id: int = 84,
+    voicevox_url: str = "http://localhost:50021",
+    user_dict_csv: Path | str | None = None,
+    add_bgm: bool = True,
+    bgm_volume_db: float = -8.0,
+    voice_gain_db: float = 3.0,
+    bgm_pad_sec: float = 15.0,
+    bgm_style: str = "musicgen",
+    bgm_prompt: str | None = None,
+) -> None:
+    """
+    既存の .txt をそのまま使い、MP3 のみを生成する（説話生成は行わない）。
+    text_path は output_dir 内の .txt で、対応する .mp3 が無いものを想定。
+    """
+    text_path = Path(text_path)
+    output_dir = Path(output_dir)
+    feed_path = Path(feed_path)
+
+    parsed = parse_output_txt(text_path)
+    body = parsed["body"]
+    if not body:
+        print(f"   本文が空です: {text_path}", file=sys.stderr)
+        return
+
+    base_name = text_path.stem
+    audio_path = output_dir / f"{base_name}.mp3"
+    print(f"   対象: {text_path.name} → {audio_path.name}")
+
+    csv_to_load = Path(user_dict_csv) if user_dict_csv is not None else VOICEVOX_USER_DICT_CSV
+    n = load_and_register_voicevox_user_dict(csv_to_load, base_url=voicevox_url)
+    if n > 0:
+        print(f"   VOICEVOX ユーザー辞書: {n} 語を登録しました。")
+
+    print("   VOICEVOX で音声化しています...")
+    text_to_speech(
+        body,
+        audio_path,
+        speaker_id=speaker_id,
+        base_url=voicevox_url,
+    )
+    print(f"   保存: {audio_path}")
+
+    if add_bgm:
+        print("   BGM を追加しています...")
+        if bgm_style == "musicgen" and bgm_prompt is None:
+            bgm_prompt = pick_random_bgm_prompt()
+            print(f"   BGM プロンプト: {bgm_prompt}")
+        mix_voice_with_bgm(
+            audio_path,
+            audio_path,
+            bgm_volume_db=bgm_volume_db,
+            voice_gain_db=voice_gain_db,
+            bgm_pad_sec=bgm_pad_sec,
+            bgm_style=bgm_style,
+            bgm_prompt=bgm_prompt,
+        )
+        print(f"   BGM 付きで上書き: {audio_path}")
+
+    podcast_title = os.environ.get("PODCAST_TITLE", "香音キャスト 〜聴くだけで心が整う。仏教説話を音で〜")
+    podcast_description = os.environ.get("PODCAST_DESCRIPTION", "AIが生成する仏教説話を毎日お届けします。")
+    podcast_website = os.environ.get("PODCAST_WEBSITE", "")
+    podcast_base_url = os.environ.get("PODCAST_BASE_URL", "")
+    podcast_image_url = os.environ.get("PODCAST_IMAGE_URL", "")
+
+    print("   Podcast RSS を更新しています...")
+    update_podcast_feed(
+        output_dir,
+        feed_path,
+        podcast_title=podcast_title,
+        podcast_description=podcast_description,
+        podcast_website=podcast_website,
+        podcast_base_url=podcast_base_url,
+        podcast_image_url=podcast_image_url,
+    )
+    print(f"   保存: {feed_path}")
+    print("   完了しました。")
+
+
 def run_pipeline(
     theme: str,
     stories_dir: Path | str = STORIES_DIR,
@@ -1405,6 +1536,8 @@ def main() -> None:
   python main.py --story-llm ollama --ollama-model llama3.2  # 説話生成をローカル Ollama で実行
   python main.py --count 3  # テーマをランダムに3本連続生成
   python main.py --theme "慈悲" --count 2  # 同じテーマで2本生成
+  python main.py --mp3-only  # .txt のみのファイルから1本をランダムに選び MP3 のみ生成
+  python main.py --mp3-only --count 3  # 上記を3回繰り返す
         """,
     )
     parser.add_argument(
@@ -1489,6 +1622,11 @@ def main() -> None:
         help="output 内の分割 WAV を結合し、feed.xml のみ再生成する（.env の PODCAST_BASE_URL を反映）。iPhone 用 URL 更新時に使用",
     )
     parser.add_argument(
+        "--mp3-only",
+        action="store_true",
+        help="output 内で .txt のみ存在するファイルを走査し、1本をランダムに選んで .txt はそのまま MP3 のみ生成（説話生成は行わない）。--count で繰り返し可能",
+    )
+    parser.add_argument(
         "--no-bgm",
         action="store_true",
         help="BGM を追加しない（デフォルトは MusicGen で BGM を追加）",
@@ -1556,6 +1694,38 @@ def main() -> None:
         except Exception as e:
             print(f"WAV の結合に失敗しました: {e}", file=sys.stderr)
             sys.exit(1)
+        return
+
+    if args.mp3_only:
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        merge_all_split_wavs_in_dir(output_dir)
+        feed_path = output_dir / "feed.xml"
+        count = max(1, getattr(args, "count", 1))
+        for i in range(count):
+            txt_only = get_txt_only_files(output_dir)
+            if not txt_only:
+                if i == 0:
+                    print("output 内に .txt のみのファイルがありません。", file=sys.stderr)
+                    sys.exit(1)
+                print(f".txt のみのファイルがなくなりました。（{i} 本まで生成済み）")
+                break
+            if count > 1:
+                print(f"\n===== MP3 のみ生成 {i + 1} / {count} 本目 =====")
+            text_path = random.choice(txt_only)
+            print(f"1. {text_path.name} から MP3 を生成します...")
+            run_mp3_only_pipeline(
+                text_path,
+                output_dir=output_dir,
+                feed_path=feed_path,
+                speaker_id=args.speaker,
+                voicevox_url=args.voicevox_url,
+                user_dict_csv=args.voicevox_user_dict,
+                add_bgm=not args.no_bgm,
+                bgm_volume_db=args.bgm_volume,
+                bgm_style=args.bgm_style,
+                bgm_prompt=args.bgm_prompt,
+            )
         return
 
     if args.list_speakers:
