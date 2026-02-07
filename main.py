@@ -1403,6 +1403,8 @@ def main() -> None:
   python main.py --theme "慈悲" --bgm-style procedural  # 手続き BGM（軽量・著作権フリー）
   python main.py --theme "慈悲" --bgm-prompt "soft piano gentle strings"  # MusicGen の雰囲気を変更
   python main.py --story-llm ollama --ollama-model llama3.2  # 説話生成をローカル Ollama で実行
+  python main.py --count 3  # テーマをランダムに3本連続生成
+  python main.py --theme "慈悲" --count 2  # 同じテーマで2本生成
         """,
     )
     parser.add_argument(
@@ -1410,6 +1412,13 @@ def main() -> None:
         type=str,
         default="",
         help="今回の説話のテーマ（未指定時はランダムに選択。例: 慈悲、忍辱、知足）",
+    )
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=1,
+        metavar="N",
+        help="連続で生成するエピソード数（未指定時は1本）。2以上で指定すると説話生成〜音声化〜BGM〜feed更新をN回繰り返す",
     )
     parser.add_argument(
         "--speaker",
@@ -1561,28 +1570,35 @@ def main() -> None:
             sys.exit(1)
         return
 
-    theme = args.theme.strip()
-    if not theme:
-        theme = pick_random_theme()
-        print(f"テーマ未指定のため、ランダムに選びました: 「{theme}」")
+    count = max(1, getattr(args, "count", 1))
+    fixed_theme = args.theme.strip()
 
-    run_pipeline(
-        theme=theme,
-        stories_dir=args.stories_dir,
-        knowledge_dir=getattr(args, "knowledge_dir", KNOWLEDGE_DIR),
-        output_dir=args.output_dir,
-        feed_path=args.output_dir / "feed.xml",
-        speaker_id=args.speaker,
-        voicevox_url=args.voicevox_url,
-        user_dict_csv=args.voicevox_user_dict,
-        story_llm=args.story_llm,
-        ollama_url=args.ollama_url,
-        ollama_model=args.ollama_model,
-        add_bgm=not args.no_bgm,
-        bgm_volume_db=args.bgm_volume,
-        bgm_style=args.bgm_style,
-        bgm_prompt=args.bgm_prompt,
-    )
+    for i in range(count):
+        if count > 1:
+            print(f"\n===== {i + 1} / {count} 本目 =====")
+        if fixed_theme:
+            theme = fixed_theme
+        else:
+            theme = pick_random_theme()
+            print(f"テーマ未指定のため、ランダムに選びました: 「{theme}」")
+
+        run_pipeline(
+            theme=theme,
+            stories_dir=args.stories_dir,
+            knowledge_dir=getattr(args, "knowledge_dir", KNOWLEDGE_DIR),
+            output_dir=args.output_dir,
+            feed_path=args.output_dir / "feed.xml",
+            speaker_id=args.speaker,
+            voicevox_url=args.voicevox_url,
+            user_dict_csv=args.voicevox_user_dict,
+            story_llm=args.story_llm,
+            ollama_url=args.ollama_url,
+            ollama_model=args.ollama_model,
+            add_bgm=not args.no_bgm,
+            bgm_volume_db=args.bgm_volume,
+            bgm_style=args.bgm_style,
+            bgm_prompt=args.bgm_prompt,
+        )
 
 
 if __name__ == "__main__":
