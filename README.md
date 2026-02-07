@@ -59,7 +59,7 @@ python main.py --theme "忍辱 — 雨の日、誰かに傘を差す／差され
 | `--ollama-model MODEL` | Ollama のモデル名（`--story-llm ollama` 時。デフォルト: llama3.2） |
 | `--no-bgm` | BGM を付けない |
 | `--bgm-style procedural` | BGM を手続き生成に（MusicGen 不要・軽量） |
-| `--speaker 9` | VOICEVOX のスピーカー ID（デフォルト: 9） |
+| `--speaker 84` | VOICEVOX のスピーカー ID（デフォルト: 84） |
 | `--voicevox-url URL` | VOICEVOX Engine の URL（デフォルト: http://localhost:50021） |
 | `--voicevox-user-dict CSV` | ユーザー辞書用 CSV のパス（未指定時は `voicevox_user_dict.csv` があれば使用） |
 | `--update-feed` | 説話生成は行わず、`output/` の内容で feed.xml のみ再生成 |

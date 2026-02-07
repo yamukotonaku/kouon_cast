@@ -984,12 +984,16 @@ def generate_musicgen_bgm(
 def mix_voice_with_bgm(
     voice_path: Path | str,
     output_path: Path | str,
-    bgm_volume_db: float = -14.0,
+    bgm_volume_db: float = -8.0,
+    voice_gain_db: float = 3.0,
+    bgm_pad_sec: float = 15.0,
     bgm_style: str = "procedural",
     bgm_prompt: str | None = None,
 ) -> Path:
     """
     音声ファイルにBGMを重ねて出力する。
+    説話の前後に BGM のみの区間（各 bgm_pad_sec 秒）を設け、唐突な始まり・終わりを避ける。
+    voice_gain_db: 説話の音量を上げるゲイン（dB）。正の値で大きく。
     bgm_style: "procedural"（手続き・著作権フリー） or "musicgen"（AI・要 transformers/torch、CC-BY-NC）
     bgm_prompt: MusicGen 用のテキストプロンプト（デフォルト: soft piano gentle strings meditation）
     """
@@ -1000,26 +1004,39 @@ def mix_voice_with_bgm(
     voice = AudioSegment.from_file(str(voice_path))
     duration_ms = len(voice)
     duration_sec = duration_ms / 1000.0
+    pad_ms = int(bgm_pad_sec * 1000)
+    total_bgm_sec = duration_sec + 2 * bgm_pad_sec
+    total_bgm_ms = int(total_bgm_sec * 1000)
+
     bgm = None
     if bgm_style == "musicgen":
         bgm = generate_musicgen_bgm(
-            duration_sec,
+            total_bgm_sec,
             sample_rate=voice.frame_rate,
             prompt=bgm_prompt or "soft piano gentle strings meditation",
         )
         if bgm is not None:
             print("   BGM: MusicGen で生成しました。")
     if bgm is None:
-        bgm = generate_procedural_bgm(duration_sec, sample_rate=voice.frame_rate)
+        bgm = generate_procedural_bgm(total_bgm_sec, sample_rate=voice.frame_rate)
         if bgm_style == "musicgen":
             print("   BGM: MusicGen が使えなかったため、手続きBGMを使用しました。")
     if voice.frame_rate != bgm.frame_rate:
         bgm = bgm.set_frame_rate(voice.frame_rate)
     if voice.channels != bgm.channels:
         bgm = bgm.set_channels(voice.channels)
-    bgm = bgm[:duration_ms]
+    bgm = bgm[:total_bgm_ms]
     bgm = bgm.apply_gain(bgm_volume_db)
-    mixed = voice.overlay(bgm)
+
+    voice_louder = voice.apply_gain(voice_gain_db)
+    # 前 15 秒: BGM のみ
+    head = bgm[:pad_ms]
+    # 中央: 説話 + BGM
+    middle_bgm = bgm[pad_ms : pad_ms + duration_ms]
+    middle = voice_louder.overlay(middle_bgm)
+    # 後 15 秒: BGM のみ
+    tail = bgm[pad_ms + duration_ms : pad_ms + duration_ms + pad_ms]
+    mixed = head + middle + tail
     output_path.parent.mkdir(parents=True, exist_ok=True)
     mixed.export(str(output_path), format="mp3")
     return output_path
@@ -1146,14 +1163,16 @@ def run_pipeline(
     knowledge_dir: Path | str = KNOWLEDGE_DIR,
     output_dir: Path | str = OUTPUT_DIR,
     feed_path: Path | str = FEED_PATH,
-    speaker_id: int = 9,
+    speaker_id: int = 84,
     voicevox_url: str = "http://localhost:50021",
     user_dict_csv: Path | str | None = None,
     story_llm: str = "gemini",
     ollama_url: str = "http://localhost:11434",
     ollama_model: str = "llama3.2",
     add_bgm: bool = True,
-    bgm_volume_db: float = -14.0,
+    bgm_volume_db: float = -8.0,
+    voice_gain_db: float = 3.0,
+    bgm_pad_sec: float = 15.0,
     bgm_style: str = "musicgen",
     bgm_prompt: str | None = None,
 ) -> None:
@@ -1243,6 +1262,8 @@ def run_pipeline(
             audio_path,
             audio_path,
             bgm_volume_db=bgm_volume_db,
+            voice_gain_db=voice_gain_db,
+            bgm_pad_sec=bgm_pad_sec,
             bgm_style=bgm_style,
             bgm_prompt=bgm_prompt,
         )
@@ -1277,7 +1298,7 @@ def main() -> None:
 例:
   python main.py  # テーマをランダムに選択
   python main.py --theme "慈悲"
-  python main.py --theme "欲と知足"  # デフォルト speaker 9
+  python main.py --theme "欲と知足"  # デフォルト speaker 84
   python main.py --theme "忍辱" --voicevox-url http://127.0.0.1:50021
   python main.py --list-speakers
   python main.py --merge-wav "乾いた心に降る雨"  # 分割 WAV を 1 つの MP3 に結合
@@ -1298,8 +1319,8 @@ def main() -> None:
     parser.add_argument(
         "--speaker",
         type=int,
-        default=9,
-        help="VOICEVOX のスピーカーID（デフォルト: 9）",
+        default=84,
+        help="VOICEVOX のスピーカーID（デフォルト: 84）",
     )
     parser.add_argument(
         "--voicevox-url",
@@ -1371,9 +1392,9 @@ def main() -> None:
     parser.add_argument(
         "--bgm-volume",
         type=float,
-        default=-14.0,
+        default=-8.0,
         metavar="DB",
-        help="BGM の音量（dB）。小さいほど小さい。デフォルト: -14",
+        help="BGM の音量（dB）。小さいほど小さい。デフォルト: -8（説話より上げ幅大）",
     )
     parser.add_argument(
         "--bgm-style",
