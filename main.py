@@ -375,6 +375,94 @@ def load_knowledge_text(knowledge_dir: Path | str) -> str:
     return "\n\n---\n\n".join(blocks) if blocks else ""
 
 
+# Web 検索で使う仏教キーワード（毎回ランダムに1つ選んで検索）
+_BUDDHIST_SEARCH_QUERIES = [
+    "仏教 四諦 八正道 教え 解説",
+    "仏教 慈悲 忍辱 布施 六波羅蜜",
+    "仏教 縁起 無常 無我 説法",
+    "仏教 中道 苦 解脱 解説",
+    "仏教 説話 教訓 ブッダ",
+    "仏教 禅定 正念 瞑想 修行",
+    "仏教 因果 業 輪廻 教え",
+    "仏教 般若 智慧 空 解説",
+    "仏教 戒律 正命 正業",
+    "仏教 慈悲の観想 メッタ 解説",
+]
+
+
+def _fetch_text_from_url(url: str, max_chars: int = 2200, timeout: int = 10) -> str:
+    """URL の本文を取得し、テキストを抽出して max_chars までに切り詰める。"""
+    import re
+
+    import requests
+    from bs4 import BeautifulSoup
+
+    try:
+        r = requests.get(
+            url,
+            timeout=timeout,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; KouonCast/1.0; +https://github.com/yamukotonaku/kouon_cast)"},
+        )
+        r.raise_for_status()
+        r.encoding = r.apparent_encoding or "utf-8"
+        soup = BeautifulSoup(r.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+        body = soup.find("body") or soup
+        text = body.get_text(separator="\n", strip=True) if body else ""
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r" +", " ", text).strip()
+        return text[:max_chars] if text else ""
+    except Exception:
+        return ""
+
+
+def fetch_one_teaching_from_web() -> str:
+    """
+    毎回、Web 上で仏教知識を検索し、1件分のテキストを取得して返す。
+    検索 → 先頭結果の URL を取得 → ページ本文を抽出（最大約2200文字）。
+    失敗時は空文字を返す。
+    """
+    try:
+        from duckduckgo_search import DDGS
+    except ImportError:
+        return ""
+
+    query = random.choice(_BUDDHIST_SEARCH_QUERIES)
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3))
+        if not results:
+            return ""
+        first = results[0]
+        url = first.get("href") or first.get("link") or first.get("url") or ""
+        if not url or not url.startswith("http"):
+            return ""
+        text = _fetch_text_from_url(url, max_chars=2200)
+        if not text or len(text) < 100:
+            return ""
+        return f"# Web で取得した仏教知識（参考）\n\n検索クエリ: {query}\n\n{text}"
+    except Exception:
+        return ""
+
+
+def load_one_extra_teaching(knowledge_dir: Path | str) -> str:
+    """
+    毎回の説話生成で1つ追加して反映する教えを取得する。
+    まず Web 検索で仏教知識を1件取得し、失敗時は knowledge/毎回追加する教え.md を読む。
+    """
+    extra = fetch_one_teaching_from_web()
+    if extra:
+        return extra
+    path = Path(knowledge_dir) / "毎回追加する教え.md"
+    if not path.is_file():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # 2. 説話生成ロジック（Gemini / Ollama 共通プロンプト）
 # ---------------------------------------------------------------------------
@@ -1199,6 +1287,13 @@ def run_pipeline(
         stories_random_n=5,
     )
     knowledge_context = load_knowledge_text(knowledge_dir)
+    extra_teaching = load_one_extra_teaching(knowledge_dir)
+    if extra_teaching:
+        knowledge_context = (knowledge_context + "\n\n---\n\n" + extra_teaching).strip()
+        if "Web で取得した仏教知識" in extra_teaching:
+            print("   教えを1件追加しました（Web 検索）")
+        else:
+            print("   教えを1件追加しました（毎回追加する教え.md）")
     print(f"   説話: {len(context)} 文字 / 知識: {len(knowledge_context)} 文字")
 
     if story_llm == "ollama":

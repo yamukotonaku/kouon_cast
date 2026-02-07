@@ -1,0 +1,6 @@
+#!/bin/sh
+# コミット直前に output/ を自動でステージする（いちいち git add output/ しなくてよい）
+if [ -d output ]; then
+	git add output/
+fi
+exit 0

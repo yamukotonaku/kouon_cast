@@ -31,6 +31,13 @@ cp .env.example .env
 
 VOICEVOX を起動した状態で、以下を実行すると説話が 1 本生成され、`output/` にテキスト・MP3・feed.xml が出力されます。Ollama を使う場合は事前に `ollama pull llama3.2` などでモデルを取得し、Ollama を起動しておいてください。
 
+**コミット時に output/ を自動でステージする（任意）**  
+`git commit` のたびに `git add output/` を打たなくてよいようにするには、初回に次を実行してください。
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ---
 
 ## 使い方

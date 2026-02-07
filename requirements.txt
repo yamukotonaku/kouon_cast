@@ -13,6 +13,10 @@ podgen>=1.1.0
 # VOICEVOX API 呼び出し
 requests>=2.28.0
 
+# 毎回の説話で Web から仏教知識を1件取得する
+duckduckgo-search>=6.0.0
+beautifulsoup4>=4.12.0
+
 # WAV 結合・MP3 変換（MP3 出力には ffmpeg のインストールが必要）
 pydub>=0.25.0
 
