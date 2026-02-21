@@ -873,47 +873,24 @@ def _parse_story_response(text: str) -> dict[str, str]:
     return {"title": title, "body": body}
 
 
-def generate_story_summary(api_key: str, title: str, body: str) -> str:
+def extract_summary_from_body(body: str, max_chars: int = 400) -> str:
     """
-    説話のタイトルと本文から、Podcast エピソード説明用の短いサマリーを Gemini で生成する。
-    戻り値: 2〜3文の要約（失敗時は空文字）
+    本文の冒頭から max_chars 文字程度を切り出してサマリーを作成する。
+    句点（。）で区切れる場合はそこで切り、自然な終わり方にする。
     """
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=api_key)
-    prompt = f"""以下の仏教説話の「導入・状況説明」だけを、2〜3文で書いてください。
-
-【条件】
-- 物語の結末・オチは一切含めないでください。
-- 誰がどんな状況にいるか、何が問われているかだけを簡潔に書き、聴き手が「続きが気になる」ような仕上がりにしてください。
-- Podcast のエピソード説明に使うため、ネタバレせず興味を引く書き方にしてください。
-- 余計な前置きや「要約は以下の通りです」などの説明は不要です。要約文だけを出力してください。
-
-【タイトル】
-{title}
-
-【本文（抜粋）】
-{body[:8000] if len(body) > 8000 else body}
-"""
-
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.4,
-                max_output_tokens=512,
-            ),
-        )
-        text = _get_response_text(response)
-        summary = (text or "").strip()
-        # 1行にまとめて改行をスペースに（Podcast 説明向け）
-        if summary:
-            summary = " ".join(summary.split())
-        return summary[:1000] if summary else ""
-    except Exception:
+    if not body:
         return ""
+    text = body.strip()
+    if len(text) <= max_chars:
+        return text
+    # max_chars 以内で最後の句点を探す
+    excerpt = text[:max_chars]
+    last_period = excerpt.rfind("。")
+    if last_period > max_chars // 2:
+        # 句点が見つかり、かつ十分な長さがあればそこで切る
+        return excerpt[: last_period + 1]
+    # 句点が無い or 短すぎる場合は max_chars で切って「…」を付ける
+    return excerpt.rstrip() + "…"
 
 
 # ---------------------------------------------------------------------------
@@ -1632,13 +1609,11 @@ def run_pipeline(
             theme=theme,
             knowledge_context=knowledge_context,
         )
-        summary = (story["body"][:400].strip() + ("…" if len(story["body"]) > 400 else "")) if story.get("body") else ""
+        summary = extract_summary_from_body(story.get("body", ""))
     else:
         print("2. Gemini で説話を生成しています...")
         story = generate_story(api_key, context, theme, knowledge_context=knowledge_context)
-        summary = generate_story_summary(api_key, story["title"], story["body"])
-        if not summary and story["body"]:
-            summary = story["body"][:400].strip() + ("…" if len(story["body"]) > 400 else "")
+        summary = extract_summary_from_body(story.get("body", ""))
 
     print(f"   タイトル: {story['title']}")
     if summary:
