@@ -736,7 +736,7 @@ def generate_story(
     prompt = _build_story_prompt(context, theme, knowledge_context)
 
     response = client.models.generate_content(
-        model="gemini-2.5-pro",
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=STORY_SYSTEM_INSTRUCTION,
@@ -899,7 +899,7 @@ def generate_story_summary(api_key: str, title: str, body: str) -> str:
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-pro",
+            model="gemini-2.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.4,
